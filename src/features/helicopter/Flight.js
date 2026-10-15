@@ -11,14 +11,14 @@ export class RotorFlight {
 	constructor( { groundAt = () => 0, collide = null, waterAt = () => 0 } = {} ) {
 		this.groundAt = groundAt; this.collide = collide; this.waterAt = waterAt;
 		this.position = new Vector3(); this.velocity = new Vector3(); this.quaternion = new Quaternion();
-		this.yaw = 0; this.pitch = 0; this.roll = 0; this.rpm = 0; this.engineOn = false;
+		this.yaw = 0; this.pitch = 0; this.roll = 0; this.rpm = 0; this.engineOn = false; this.starter = false;
 		this.grounded = true; this.onWater = false; this.agl = 0; this.events = []; this._impactWait = 0;
 		this.controls = { forward: 0, strafe: 0, yaw: 0, lift: 0, brake: false };
 	}
 
 	place( x, y, z, yaw = 0 ) {
 		this.position.set( x, y, z ); this.velocity.set( 0, 0, 0 ); this.yaw = yaw;
-		this.pitch = this.roll = this.rpm = 0; this.engineOn = false; this.events.length = 0;
+		this.pitch = this.roll = this.rpm = 0; this.engineOn = false; this.starter = false; this.events.length = 0;
 		this.quaternion.setFromEuler( _e.set( 0, yaw, 0, 'YXZ' ) );
 		const floor = this.groundAt( x, z, y + 0.15 );
 		this.grounded = Number.isFinite( floor ) && Math.abs( floor - y ) < 0.15;
@@ -39,7 +39,7 @@ export class RotorFlight {
 	step( dt ) {
 		const p = this.position, v = this.velocity, c = this.controls;
 		_old.copy( p ); this._impactWait = Math.max( 0, this._impactWait - dt );
-		this.rpm += ( ( this.engineOn ? 1 : 0 ) - this.rpm ) * ( 1 - Math.exp( - dt / ( this.engineOn ? 1.1 : 2 ) ) );
+		this.rpm += ( ( this.engineOn ? 1 : this.starter ? .22 : 0 ) - this.rpm ) * ( 1 - Math.exp( - dt / ( this.engineOn || this.starter ? 1.1 : 2 ) ) );
 		const powered = this.engineOn && this.rpm > 0.8 && ! this.onWater;
 		const forward = c.brake ? 0 : clamp( c.forward || 0, - 1, 1 ), strafe = c.brake ? 0 : clamp( c.strafe || 0, - 1, 1 );
 		if ( powered ) this.yaw += clamp( c.yaw || 0, - 1, 1 ) * FLIGHT.yaw * dt;

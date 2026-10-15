@@ -157,7 +157,7 @@ export class SeaplanePanel {
 			// the airframe out belongs to the other hangar (the strip / the ramp): this one only sells and swaps
 			acts += `<button class="sp-btn" data-act="close">${ t( 'seaplane.close', 'Close' ) }</button>`;
 			this.el.innerHTML = `
-<div class="sp-head"><div><h2>${ v.scope === 'strip' ? t( 'seaplane.stripTitle', 'Airstrip hangar' ) : t( 'seaplane.title', 'Seaplane hangar' ) }</h2><p class="sp-sub">${ t( 'seaplane.outElsewhere', 'Out now' ) }: ${ v.name }</p></div></div>
+<div class="sp-head"><div><h2>${ v.scope === 'airport' ? 'Meridian Airport · courtesy fleet' : v.scope === 'strip' ? t( 'seaplane.stripTitle', 'Airstrip hangar' ) : t( 'seaplane.title', 'Seaplane hangar' ) }</h2><p class="sp-sub">${ t( 'seaplane.outElsewhere', 'Out now' ) }: ${ v.name }</p></div></div>
 <div class="sp-fleet">${ fleet }</div>
 <div class="sp-acts">${ acts }</div>
 <div class="sp-msg ${ this.msg && this.msg.bad ? 'is-bad' : '' }">${ this.msg ? this.msg.text : '' }</div>`;
@@ -210,7 +210,7 @@ export class SeaplanePanel {
 		acts += `<button class="sp-btn" data-act="close">${ t( 'seaplane.close', 'Close' ) }</button>`;
 		const notes = t( 'seaplane.notes2', 'Board at the door from the jetty (E). <kbd>O</kbd> starts the engine (or just open the throttle), <kbd>Shift</kbd> / <kbd>C</kbd> throttle, <kbd>W</kbd> / <kbd>S</kbd> nose down / up, <kbd>A</kbd> / <kbd>D</kbd> bank (steer while taxiing), <kbd>,</kbd> / <kbd>.</kbd> rudder, <kbd>[</kbd> / <kbd>]</kbd> flaps, <kbd>-</kbd> / <kbd>=</kbd> trim, <kbd>Y</kbd> autopilot, <kbd>V</kbd> the cockpit (click its switches). <kbd>\'</kbd> twice in the air bails out on the parachute. Flaps 1, get on the step and pull back gently near 26 m/s. Land into the water slowly: a sink over 3 m/s bends the floats. A full tank lasts about 25 minutes at full power. A hard arrival springs a float; a crash breaks the plane up (you are thrown clear unless you fly straight into something): the crew of Captain Roid recovers the wreck from here.' );
 		this.el.innerHTML = `
-<div class="sp-head"><div><h2>${ v.scope === 'strip' ? t( 'seaplane.stripTitle', 'Airstrip hangar' ) : t( 'seaplane.title', 'Seaplane hangar' ) }</h2><p class="sp-sub">${ v.name } · ${ ( v.airframes.find( ( a ) => a.current ) || {} ).sub || t( 'seaplane.sub', 'A jade high-wing floatplane: takes off from and lands on the water' ) }</p></div></div>
+<div class="sp-head"><div><h2>${ v.scope === 'airport' ? 'Meridian Airport · courtesy fleet' : v.scope === 'strip' ? t( 'seaplane.stripTitle', 'Airstrip hangar' ) : t( 'seaplane.title', 'Seaplane hangar' ) }</h2><p class="sp-sub">${ v.name } · ${ ( v.airframes.find( ( a ) => a.current ) || {} ).sub || t( 'seaplane.sub', 'A jade high-wing floatplane: takes off from and lands on the water' ) }</p></div></div>
 <div class="sp-fleet">${ fleet }</div>
 <div class="sp-rows">${ rows.join( '' ) }</div>
 <div class="sp-acts">${ acts }</div>

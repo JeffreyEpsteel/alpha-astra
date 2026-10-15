@@ -8,6 +8,10 @@
 //   keys while driving: W / S throttle, brake and reverse, A / D steer, Space handbrake, H horn, E get out; phones: the
 //       touch cluster writes c.touch = { active, steer, throttle, brake, handbrake, horn } (TouchControls patch); a pad:
 //       left stick, triggers
+//   Cockpit: V driver's eye, 3 accessible dashboard (Escape closes); look at physical switches and click.
+//       c.cockpitAct('engine'|'lights'|'park'|'horn'|'siren') drives actual controls. Engine switches only below 0.8m/s.
+//       Every kind has a local detailed cabin; traffic remains instanced. RPM/automatic gear derive from wheel speed,
+//       feed engine audio, and engine off removes drive/reverse force (service brakes still work). No fuel system.
 //   c.traffic (Traffic.js: AI cars on the plan's road graph: lanes, limits, lights, give way, honks, reroutes, buses)
 //   c.graph (RoadGraph.js)   c.records (parked, idle, own, wrecks, pursuers)   c.heat 0..100 / c.level 0..5 (the city's
 //       wanted level: the police chase; bust() fines you)   c.damage( rec, hp )   c.blast( x, y, z, r, energy )
@@ -30,7 +34,8 @@
 //   (falling rubble dents cars), explosion, cannonballImpact, remoteWorldEvent.
 // Headless: install( app, features, { render: false, plan, colliders, terrain, roadHeight, rand, seed, scale, traffic,
 //   citizens: () => sims, input: () => input, meridian, alwaysActive } ).
-// Save: { v, heat, owned: [ { id, kind, color, x, y, z, yaw, hp, island } ] } (your cars stay where you left them).
+// Save: { v, heat, owned: [ { id, kind, color, x, y, z, yaw, hp, island, engineOn?, parkBrake? } ] }.
+// Your cars and engine/parking-brake switches stay where you left them; older saves default to engine on, brake off.
 
 import { Cars } from './Cars.js';
 

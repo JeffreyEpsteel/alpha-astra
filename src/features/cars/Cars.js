@@ -12,6 +12,8 @@ import { Traffic } from './Traffic.js';
 import { CarAudio } from './CarAudio.js';
 import { DealerPanel } from './DealerPanel.js';
 import { Mirror, encodeSnapshot } from './CarNet.js';
+import { CarCockpit } from './CarCockpit.js';
+import { drivetrain } from './CarSystems.js';
 
 const SAVE_VERSION = 1;
 const FAR = { x: 1e9, y: - 1e4, z: 1e9 };
@@ -82,6 +84,7 @@ export class Cars {
 		} );
 		this.audio = new CarAudio( this.app );
 		this.panel = new DealerPanel( this );
+		this.cockpit = new CarCockpit( this );
 		this.render = null;
 		if ( opts.render !== false && this.app.scene && this.app.scene.add ) {
 
@@ -211,8 +214,10 @@ export class Cars {
 	// the driver is not drawn in a car (the cabins are too small for the islanders; App patch: avatar.visible)
 	hidesDriver() { return !! this.drive; }
 
-	isOpen() { return this.panel.isOpen; }
-	close() { this.panel.close(); }
+	isOpen() { return this.panel.isOpen || this.cockpit.isOpen; }
+	close() { this.panel.close(); this.cockpit.close(); }
+	wantsMouse() { return this.cockpit.firstPerson && !! this.cockpit.hover; }
+	cockpitAct( id ) { return this.cockpit.act( id ); }
 
 	_toast( text, ms = 3000 ) {
 
@@ -435,16 +440,20 @@ export class Cars {
 		rec.state = 'player';
 		rec.mine = true; // (taken: no alarm when you get back in)
 		this.drive = rec;
+		rec.engineOn ??= true;
+		rec.parkBrake ??= false;
+		this._hornPulse = 0; this._horn = this._hornWas = false;
 		this.stats.taken ++;
 		const S = rec.spec, v = this.vehicle;
 		v.seat = S.seat; v.eye = S.eye; v.chase = S.chase; v.focus = [ 0, Math.min( 2.2, S.hgt * 0.85 ), 0 ];
 		this._syncQuat( rec );
 		p.enterVehicle( v );
+		this.cockpit.setRecord( rec );
 		this._emit( 'carEntered', { id: rec.id, kind: rec.kind, own: rec.own, how } );
 		if ( ! this._tip ) {
 
 			this._tip = true;
-			this._toast( 'W / S drive and brake · A / D steer · Space handbrake · H horn · E get out', 4600 );
+			this._toast( 'W/S drive · A/D steer · Space handbrake · H horn · L lamps · V camera · 3 dashboard · E exit', 4600 );
 
 		}
 
@@ -477,6 +486,8 @@ export class Cars {
 		}
 
 		this.drive = null;
+		this.cockpit.setRecord( null );
+		this._hornPulse = 0; this._horn = this._hornWas = false;
 		this._sinceExit = 0;
 		this.siren = false;
 		rec.state = rec.stage >= 4 ? 'wreck' : 'idle';
@@ -543,7 +554,18 @@ export class Cars {
 		if ( ! rec ) return;
 		this._driven = true;
 		const b = this._bodyFor( rec );
-		const inp = this.opts.input ? this.opts.input() : this._input();
+		const input = this.app.input;
+		if ( input?.hit?.( 'Digit3' ) && ! this.cockpit.blocked() ) {
+
+			if ( this.cockpit.isOpen ) this.cockpit.close(); else this.cockpit.open();
+
+		}
+		const inp = { ...( this.opts.input ? this.opts.input() : this._input() ) };
+		inp.engineOn = rec.engineOn !== false && rec.stage < 4 && rec.hp > 0;
+		if ( ! inp.engineOn ) inp.throttle = 0;
+		if ( rec.parkBrake ) { inp.handbrake = true; inp.throttle = 0; inp.brake = 0; }
+		inp.horn = inp.horn || this._hornPulse > 0;
+		this._hornPulse = Math.max( 0, ( this._hornPulse || 0 ) - dt );
 		this._horn = !! inp.horn;
 		// a police car's siren: the horn twice within 0.4 s
 		if ( inp.horn && ! this._hornWas ) {
@@ -1488,6 +1510,7 @@ export class Cars {
 		this._effects( dt, pos );
 		this._lightsUpdate( night );
 		this._audioUpdate( dt );
+		this.cockpit.update( dt );
 		this._draw( pos, night );
 		this._remoteAge( dt );
 		this._flushGone();
@@ -1580,7 +1603,8 @@ export class Cars {
 		if ( r && r.body ) {
 
 			const b = r.body, inp = b.input || {};
-			this.audio.update( dt, { on: r.stage < 4, rpm: Math.min( 1, Math.abs( b.speed ) / r.spec.top * 1.6 % 1 * 0.6 + Math.abs( b.speed ) / r.spec.top * 0.4 + ( inp.throttle || 0 ) * 0.2 ), throttle: inp.throttle || 0, slip: b.slip, horn: !! this._horn, x: r.x, y: r.y + 0.8, z: r.z, siren } );
+			const engine = drivetrain( r );
+			this.audio.update( dt, { on: engine.engineOn, rpm: engine.rpm / 6500, throttle: inp.throttle || 0, slip: b.slip, horn: !! this._horn, x: r.x, y: r.y + 0.8, z: r.z, siren } );
 			if ( this._horn && this.time - ( this._hornScare || - 9 ) > 1 ) {
 
 				this._hornScare = this.time;
@@ -2002,7 +2026,7 @@ export class Cars {
 
 		return {
 			v: SAVE_VERSION, heat: Math.round( this.heat ),
-			owned: this.owned().filter( ( r ) => r.stage < 4 ).map( ( r ) => ( { id: r.id, kind: r.kind, color: r.color, x: r2( r.x ), y: r2( r.y ), z: r2( r.z ), yaw: r2( r.yaw ), hp: r2( r.hp ), island: 'meridian' } ) ),
+			owned: this.owned().filter( ( r ) => r.stage < 4 ).map( ( r ) => ( { id: r.id, kind: r.kind, color: r.color, x: r2( r.x ), y: r2( r.y ), z: r2( r.z ), yaw: r2( r.yaw ), hp: r2( r.hp ), island: 'meridian', engineOn: r.engineOn !== false, parkBrake: !! r.parkBrake } ) ),
 		};
 
 	}
@@ -2019,6 +2043,8 @@ export class Cars {
 			const rec = this._record( o.kind, { x: o.x, y: Number.isFinite( o.y ) ? o.y : 0, z: o.z, yaw: Number( o.yaw ) || 0, color: Number.isFinite( o.color ) ? o.color : null, state: 'idle', id: typeof o.id === 'string' ? o.id.slice( 0, 40 ) : null } );
 			rec.own = true;
 			rec.mine = true;
+			rec.engineOn = o.engineOn !== false;
+			rec.parkBrake = o.parkBrake === true;
 			if ( Number.isFinite( o.hp ) ) { rec.hp = clamp( o.hp, 1, rec.maxHp ); rec.stage = stageOf( rec.hp / rec.maxHp ); }
 			quatYPR( rec.yaw, 0, 0, rec.quat );
 			this.records.push( rec );
@@ -2052,6 +2078,7 @@ export class Cars {
 		for ( const r of this.records ) this._stopFx( r );
 		this.audio.dispose();
 		this.panel.dispose();
+		this.cockpit.dispose();
 		if ( this.render ) this.render.dispose();
 
 	}

@@ -381,10 +381,12 @@ export const GPU = {
 	syncCompiles: [], // labels of pipelines needed before their async compile finished (diagnostics)
 	// compile progress for the loader and the error card: started = the pipeline(s) compiling NOW (a hang names its culprit)
 	pipelineStats: { requested: 0, done: 0, failed: 0, timedOut: 0, last: '', started: '', startedAt: 0, active: new Set() },
-	// How many compiles run at once (Infinity: all at once, the desktop browsers' worker threads) and how long one may take
+	// Bound desktop compilation too: hundreds of simultaneous requests can spend
+	// their whole timeout waiting on the driver when two game tabs start together.
+	// How many compiles run at once and how long one may take
 	// before it is skipped (failed, non-fatal; a late result still revives it). main.js sets 1 / 12 s on phones and WebKit:
 	// on an iPhone the loader stopped at 'Compiling shaders… 113 / 282' with nothing moving (wave 7).
-	compileConcurrency: Infinity,
+	compileConcurrency: 4,
 	compileTimeout: 30000,
 	// phones (main.js): the loading frame compiles only the mesh pipelines its view draws; the rest when first in view
 	lazyPipelines: false,

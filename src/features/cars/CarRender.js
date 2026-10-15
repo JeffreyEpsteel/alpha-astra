@@ -268,6 +268,7 @@ export class CarRender {
 				this.cabinMats.push( glassMat, cabinMat );
 				extras.set( 'CarGlass', { geometry: split.glass, material: glassMat } );
 				const bounds = carCabinBounds( K, split.glass );
+				set.cabinBounds = bounds;
 				const cabin = carCabinGeometry( K, bounds );
 				this.derived.push( cabin );
 				extras.set( 'CarCabin', { geometry: cabin, material: cabinMat } );
@@ -383,7 +384,8 @@ export class CarRender {
 				if ( ! vs ) continue;
 				const im = PARTS[ k ] === 'CarLamp' ? vs[ 0 ] : vs[ v ];
 				const idx = PARTS[ k ] === 'CarLamp' ? set.n[ 0 ] + set.n[ 1 ] + set.n[ 2 ] - 1 : i;
-				im.setMatrixAt( idx, _mb );
+				// Only the occupied car has a detailed local cabin; the city's other cabins stay instanced.
+				im.setMatrixAt( idx, r.cockpitDetailed && PARTS[ k ] === 'CarCabin' ? _m.copy( _mb ).scale( _s.set( 0, 0, 0 ) ) : _mb );
 				if ( k === 0 ) {
 
 					if ( wreck ) _c.setRGB( 0.06, 0.055, 0.05 );

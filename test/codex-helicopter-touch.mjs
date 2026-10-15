@@ -38,7 +38,7 @@ const tc = new TouchControls( { app, ui, input, device: { coarse: true, phone: t
 player.position.copy( h.flight.toWorld( [ 1.35, 0, 0.65 ] ) ); h.board(); tc.update( 1 / 60 );
 check( tc._mode() === 'helicopter' && tc.root.dataset.mode === 'helicopter', 'touch distinguishes helicopter from generic plane and car' );
 check( HELICOPTER_BUTTONS.every( id => ! tc.btns[ id ].hidden && parseInt( tc.btns[ id ].style.minHeight ) >= 48 ), 'rise, descend, hover and both slides have separate visible 48 px targets' );
-check( tc.leverEl.hidden && tc.btns.cockpit.hidden && tc.btns.bail.hidden && tc.btns.cast.hidden, 'plane throttle/bail and fishing controls do not appear in rotorcraft' );
+check( tc.leverEl.hidden && ! tc.btns.cockpit.hidden && tc.btns.bail.hidden && tc.btns.cast.hidden, 'helicopter systems tray is available without plane throttle/bail or fishing controls' );
 tc._stick = { v: { x: 0.8, y: - 0.8, mag: 1, sprint: true, kx: 30, ky: - 30 } }; tc._sync();
 check( ! touchKeys.has( 'ShiftLeft' ) && ( touchKeys.has( 'KeyW' ) || touchKeys.has( 'KeyD' ) ), 'outer stick controls movement without accidental climb from sprint ring' );
 const press = id => tc._press( 7, tc.btns[ id ] ), release = () => tc._up( { pointerId: 7, type: 'pointerup', clientY: 0 } );

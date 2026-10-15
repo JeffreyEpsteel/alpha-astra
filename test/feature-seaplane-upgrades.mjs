@@ -108,7 +108,7 @@ function topSpeed( s, sec = 120 ) {
 	ok( j.hullPoints === 1.5 && Math.abs( j.mass / SPEC.mass - 1.06 ) < 1e-9, 'armour: +50 % hull points, +6 % mass' );
 	ok( j.rough > 1 && j.humpDrag < 1 && j.lights.pair && j.lights.search && j.radio && j.livery === 2, 'floats tier 1 (rough water), the lights, the searchlight, the radio and the livery are in the spec' );
 	ok( SPEC.maxThrust === thrust0 && SPEC.flaps.notches === undefined && spec( 'jade' ).maxThrust === thrust0, 'spec() is pure: the base SPEC is untouched' );
-	ok( AIRFRAME_IDS.join( ',' ) === 'jade,petrel,albatross,kestrel' && AIRFRAMES.petrel.price === 11000 && AIRFRAMES.albatross.price === 42000, 'four airframes: Jade, Petrel ($11,000), Albatross ($42,000), Kestrel' );
+	ok( AIRFRAME_IDS.join( ',' ) === 'jade,petrel,albatross,kestrel,swift,courier' && AIRFRAMES.petrel.price === 11000 && AIRFRAMES.albatross.price === 42000, 'original four airframes preserved, plus two airport variants' );
 	const p = spec( 'petrel' ), a = spec( 'albatross' ), k = spec( 'kestrel' );
 	ok( p.seats === 2 && p.litres < 300 && p.rough < 1 && p.mass < SPEC.mass, 'the Petrel: 2 seats, a small tank, fragile floats, light' );
 	ok( a.seats === 4 && a.crates === 6 && a.litres > 600 && a.rough === 1.5 && a.geom.engines.length === 2 && a.geom.floats[ 0 ].side === 0 && a.mass > 2 * SPEC.mass, 'the Albatross: 4 seats, a 6-crate bay, a big tank, a hull (rough x1.5), two engines, heavy' );
@@ -246,7 +246,7 @@ class InputStub {
 
 // a strip on a flat graded shelf far out at sea (x 2600): ground y 3 on the runway and the apron, water around it
 const STRIP = { x: 2600, z: 400, y: 3, heading: 0, length: 420, width: 26, pad: { x: 2630, z: 240 } };
-const world = ( strip = true ) => ( { islands: [ { id: 'testfield' } ], ...( strip ? { testfield: { airstrip: STRIP } } : {} ), ports: WORLD.ports } );
+const world = ( strip = true ) => ( { islands: [ { id: 'testfield' } ], ...( strip ? { testfield: { airstrip: STRIP }, meridian: WORLD.meridian } : {} ), ports: WORLD.ports } );
 
 function makeWorld( { mode = null, money = 0, strip = true } = {} ) {
 
@@ -574,6 +574,7 @@ function makeWorld( { mode = null, money = 0, strip = true } = {} ) {
 	for ( const id of AIRFRAME_IDS ) {
 
 		const W = makeWorld( { mode: 'sandbox' } );
+		if ( AIRFRAMES[ id ].base === 'airport' ) { const b = W.sp.base( id ); W.player.position.set( b.x, b.y, b.z ); }
 		W.sp.buy( id );
 		if ( id === 'jade' ) W.sp.fit( 'flaps' );
 		W.sp.board();
@@ -594,7 +595,8 @@ function makeWorld( { mode = null, money = 0, strip = true } = {} ) {
 // ---------------------------------------------------------------- the models
 {
 
-	for ( const id of AIRFRAME_IDS ) {
+	// Raw authored GLBs: derived airport meshes are checked through the real loader in codex-airport-fleet.mjs.
+	for ( const id of AIRFRAME_IDS.filter( ( id ) => ! AIRFRAMES[ id ].variant ) ) {
 
 		const url = new URL( '../public/' + AIRFRAMES[ id ].model, import.meta.url );
 		if ( ! fs.existsSync( url ) ) {

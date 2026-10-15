@@ -1,4 +1,4 @@
-// The spyglass (docs/UNREAL_PARITY.md W15): G raises it (x4), G again closer (x9), a third time lowers it; Escape too.
+// The spyglass (docs/UNREAL_PARITY.md W15): Backslash raises it (x4), again closer (x9), a third time lowers it; Escape too.
 // The view narrows (the camera's fov over the zoom, mouse look slowed to match) inside a round eyepiece, and what is
 // in the glass gets a small label: ships (name, flag), ports, wrecks, the caches you know of and the inverted
 // landmark, each with its distance. Hold an undiscovered cache in the middle of the glass for a moment and it is
@@ -99,7 +99,7 @@ export function spyTargets( app, features, treasure = null ) {
 
 export class Spyglass {
 
-	constructor( app, features, { treasure = null, key = 'KeyG' } = {} ) {
+	constructor( app, features, { treasure = null, key = 'Backslash' } = {} ) {
 
 		this.app = app;
 		this.features = features || null;

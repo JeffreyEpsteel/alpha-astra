@@ -10,11 +10,11 @@ export class HelicopterHUD {
 	}
 	update( h ) {
 		if ( ! this.root ) return;
-		this.root.hidden = ! h.piloted || h.blocked();
+		this.root.hidden = ! h.piloted || h.blocked() || h.app.player?.view === 'first';
 		if ( this.root.hidden ) return;
-		const v = h.view(), rotor = v.rpm < 0.8 ? 'ROTOR STARTING' : v.grounded ? 'LANDED' : 'FLIGHT';
+		const v = h.view(), rotor = v.starting ? 'STARTER' : ! v.running ? 'TURBINE OFF' : v.rpm < 0.8 ? 'ROTOR STARTING' : v.hold ? 'POSITION HOLD' : v.grounded ? 'LANDED' : 'FLIGHT';
 		const touch = h.app.input?.touchMode;
-		const text = `RESCUE ${ rotor }  ·  ALT ${ v.altitude } m  ·  AGL ${ v.agl } m\n${ v.speed } km/h  ·  V/S ${ v.verticalSpeed.toFixed( 1 ) } m/s  ·  ROTOR ${ Math.round( v.rpm * 100 ) }%  ·  HULL ${ v.hp }%\n` + ( touch ? 'Stick: forward/back + turn · Rise / Descend: altitude\nHover / brake: stop · Slide: sideways · View: cockpit · E exit when landed' : 'W/S forward/back · A/D turn · ,/. strafe · Shift rise · C descend\nSpace hover/brake · V cockpit · E exit when landed' );
+		const text = `RESCUE ${ rotor }  ·  ALT ${ v.altitude } m  ·  AGL ${ v.agl } m\n${ v.speed } km/h  ·  V/S ${ v.verticalSpeed.toFixed( 1 ) } m/s  ·  ROTOR ${ Math.round( v.rpm * 100 ) }%  ·  HULL ${ v.hp }%${ v.warnings.length ? '\n' + v.warnings.join( ' · ' ) : '' }\n` + ( touch ? 'Stick: forward/back + turn · Rise / Descend: altitude\nHover / brake: stop · Slide: sideways · View: cockpit · Cockpit: systems' : 'W/S forward/back · A/D turn · ,/. strafe · Shift rise · C descend\nSpace brake · V cockpit · O turbine · Y hold · 3 systems · E exit landed' );
 		if ( text !== this._last ) { this.root.textContent = text; this._last = text; }
 	}
 	dispose() { this.root?.remove(); this.root = null; }

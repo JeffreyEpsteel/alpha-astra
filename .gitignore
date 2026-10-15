@@ -26,3 +26,7 @@ inspiration/
 tools/alpha-astra-github.mjs
 tools/codex-browser-qa.mjs
 tools/codex-city-browser-qa.mjs
+tools/codex-dual-browser-qa.mjs
+tools/codex-vehicle-browser-qa.mjs
+tools/codex-airport-browser-qa.mjs
+tools/codex-car-browser-qa.mjs

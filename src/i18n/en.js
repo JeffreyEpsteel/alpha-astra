@@ -28,6 +28,7 @@ export default {
 	'worldmap.helicopter': 'Rescue helicopter',
 	'worldmap.parkedHelicopter': 'parked',
 	'worldmap.helicopterPilot': 'You · rescue helicopter',
+	'ui.help.spyglass': 'Spyglass: raise, zoom, lower',
 
 	// Settings tabs and folders
 	'tab.ocean': 'Ocean',

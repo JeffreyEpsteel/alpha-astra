@@ -27,6 +27,8 @@ export const AIRFRAMES = {
 	petrel: { id: 'petrel', name: 'Petrel', sub: 'Light bush floatplane: short runs, tight turns', price: 11000, cls: 0.6, seats: 2, crates: 0, litres: 160, rough: 0.8, hull: false, land: false, base: 'ramp', model: 'models/seaplane/Petrel.glb', cockpit: 'petrel' },
 	albatross: { id: 'albatross', name: 'Albatross', sub: 'Twin-engine flying boat: fast, heavy, a cargo bay', price: 42000, cls: 2.2, seats: 4, crates: 6, litres: 900, rough: 1.5, hull: true, land: false, base: 'ramp', model: 'models/seaplane/Albatross.glb', cockpit: 'albatross' },
 	kestrel: { id: 'kestrel', name: 'Kestrel', sub: 'Land plane on fixed wheels: flies from the airstrip', price: 16000, cls: 1, seats: 4, crates: 0, litres: 280, rough: 1, hull: false, land: true, base: 'strip', model: 'models/seaplane/Kestrel.glb', cockpit: 'kestrel' },
+	swift: { id: 'swift', name: 'Swift', sub: 'Airport courtesy trainer: light, short-wing, easy to fly', price: 0, cls: 0.7, seats: 2, crates: 0, litres: 180, rough: 1, hull: false, land: true, base: 'airport', model: 'models/seaplane/Kestrel.glb', cockpit: 'swift', variant: { span: 11.6, tail: 0.9 }, livery: 3 },
+	courier: { id: 'courier', name: 'Meridian Courier', sub: 'Airport courtesy twin: long wings and a four-crate cargo bay', price: 0, cls: 1.6, seats: 4, crates: 4, litres: 520, rough: 1.3, hull: false, land: true, base: 'airport', model: 'models/seaplane/Kestrel.glb', cockpit: 'courier', variant: { span: 16.4, tail: 1.2, twin: true }, livery: 2 },
 };
 export const AIRFRAME_IDS = Object.keys( AIRFRAMES );
 
@@ -216,6 +218,26 @@ const BASE = {
 		fuelMinutes: 26,
 		land: true,
 	} ),
+};
+
+// Airport variants keep the authored cabin, eye point, panel and tricycle gear.
+// Their wing spans and propeller stations are also applied to the visual model.
+BASE.swift = () => ( {
+	...BASE.kestrel(), mass: 1080, inertia: [ 2600, 3800, 2100 ], maxThrust: 4200, pitchSpeed: 67,
+	geom: { ...KESTREL_GEOM, span: 11.6, strike: strikeFor( 11.6, JADE_STRIKE_BODY ) },
+	surfaces: BASE.petrel().surfaces, dragArea: 0.82, fuelMinutes: 28,
+} );
+BASE.courier = () => {
+	const engines = [ [ 2.7, 2.75, 1.7 ], [ - 2.7, 2.75, 1.7 ] ];
+	const props = engines.map( ( p ) => [ p[ 0 ], p[ 1 ], 2.9 ] );
+	return {
+		...BASE.kestrel(), mass: 2450, inertia: [ 6500, 10800, 6800 ], maxThrust: 11200, pitchSpeed: 91,
+		geom: { ...KESTREL_GEOM, span: 16.4, engines, props, prop: props[ 0 ], propRadius: 1.3,
+			strike: strikeFor( 16.4, [ ...JADE_STRIKE_BODY.filter( ( p ) => p[ 0 ] !== 'propeller' ), ...props.map( ( p ) => [ 'propeller', ...p ] ) ] ) },
+		thrustPoint: engines[ 0 ], discArea: 2 * Math.PI * 1.3 ** 2,
+		surfaces: SPEC.surfaces.map( ( s ) => ( { ...s, pos: s.pos.map( ( v, i ) => i === 0 ? v * 16.4 / GEOM.span : v ), area: s.area * ( s.name.startsWith( 'wing' ) ? 1.32 : 1.2 ) } ) ),
+		dragArea: 1.25, sideArea: 6.0, gearK: 125000, gearC: 11000, fuelMinutes: 34,
+	};
 };
 
 // cargo stations (model frame): where the crates ride

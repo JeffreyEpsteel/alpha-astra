@@ -6,7 +6,7 @@
 //   ex.treasure (Treasure.js: sites, found, claimed, claim( id ), markers())  ex.spyglass (Spyglass.js: toggle(), zoom)
 //   ex.ribbon (HeadingRibbon.js)  ex.markers() (the world map's: known caches)  ex.close() (Escape lowers the glass)
 //
-// Keys: G raises / zooms / lowers the spyglass (claimed on the registry as 'exploration'). E claims a cache (registry
+// Keys: Backslash raises / zooms / lowers the spyglass (claimed as 'exploration'). E claims a cache (registry
 // interactables). Saved: { treasure: { found, claimed, trinkets } }. Events: 'treasureFound', 'treasureClaimed'.
 // Hooks the root needs: the MODULES entry, placed after 'inverted' (the fallen cache under the landmark) and after
 // 'naval' (ship labels); features.update runs after CameraFeel in App._frame, so no camera hook is required.
@@ -22,7 +22,7 @@ export class Exploration {
 		this.app = app;
 		this.features = features || null;
 		this.treasure = new Treasure( app, features, opts );
-		this.spyglass = new Spyglass( app, features, { treasure: this.treasure, key: opts.key || 'KeyG' } );
+		this.spyglass = new Spyglass( app, features, { treasure: this.treasure, key: opts.key || 'Backslash' } );
 		this.ribbon = new HeadingRibbon( app, features );
 
 	}

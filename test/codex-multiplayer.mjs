@@ -57,6 +57,9 @@ check( 'online pause has no save/load/import controls; solo still does', () => {
 check( 'helicopter state survives real protocol and normalizes transforms', () => {
 	const state = sanitizeState( { p: [ 1, 2, 3 ], yaw: 0, mode: 'seat', helicopter: { p: [ 40, 500, - 12 ], q: [ 0, 0, 0, 2 ], rpm: 5, homeSlot: 42, piloted: true } } );
 	assert.deepEqual( state.helicopter, { p: [ 40, 500, -12 ], q: [ 0, 0, 0, 1 ], rpm: 1, homeSlot: 15, piloted: true } );
+	for ( const [ input, expected ] of [ [ 9, 9 ], [ 0, 0 ], [ 999, 15 ], [ - 3, 0 ], [ 2.7, 3 ], [ '15', 0 ], [ NaN, 0 ] ] ) {
+		assert.equal( sanitizeHelicopter( { ...state.helicopter, lights: input } ).lights, expected );
+	}
 	for ( const bad of [ {}, { p: [ NaN, 0, 0 ], q: [ 0, 0, 0, 1 ] }, { p: [ 0, 0, 0 ], q: [ 0, 0, 0, 0 ] }, { p: [ 1e9, 0, 0 ], q: [ 0, 0, 0, 1 ] } ] ) assert.equal( sanitizeHelicopter( bad ), undefined );
 } );
 console.log( `${ checks } multiplayer restriction checks passed` );

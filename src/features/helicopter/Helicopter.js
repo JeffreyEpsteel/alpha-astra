@@ -4,9 +4,12 @@ import { HelicopterVisual, buildHelipad } from './Model.js';
 import { RemotePlanes } from '../seaplane/Remote.js';
 import { RotorAudio } from './Audio.js';
 import { HelicopterHUD } from './HUD.js';
+import { RotorSystems } from './Systems.js';
+import { HelicopterCockpit } from './Cockpit.js';
 
 export const HOME = Object.freeze( { x: 18, z: - 68, yaw: 0 } );
-export const CONTROLS = 'W/S forward/back · A/D turn · ,/. strafe · Shift rise · C descend · Space hover/brake · V cockpit · E enter/exit after landing';
+export const CONTROLS = 'W/S forward/back · A/D turn · ,/. strafe · Shift rise/start · C descend · Space hover/brake · V cockpit · O turbine · U avionics · Y position hold · N nav · ; landing light · 3 systems · E exit after landing';
+export const COCKPIT_KEYS = Object.freeze( { KeyO: 'engine', KeyU: 'master', KeyY: 'hold', KeyN: 'nav', Semicolon: 'landing', Digit3: 'panel' } );
 const finitePose = p => Array.isArray( p ) && p.length === 4 && p.every( Number.isFinite ) && Math.abs( p[ 0 ] ) < 50000 && Math.abs( p[ 2 ] ) < 50000 && p[ 1 ] > - 100 && p[ 1 ] < 1200;
 const _door = new Vector3(), _exit = new Vector3();
 const clamp = ( v, a, b ) => Math.max( a, Math.min( b, v ) );
@@ -26,15 +29,17 @@ export class Helicopter {
 			collide: ( p, r, h ) => this.app.colliders?.resolveCapsule?.( p, r, h, 0.08 ) || false,
 		} );
 		this.flight.place( HOME.x, this.homeY, HOME.z, HOME.yaw );
+		this.systems = new RotorSystems( this.flight ); this.lights = this.systems.lights;
 		this.lastLanding = [ HOME.x, this.homeY, HOME.z, HOME.yaw ];
 		this.visual = opts.render === false || ! this.app.scene ? null : new HelicopterVisual( this.app.scene );
 		// Reuse the tested interpolation/lifecycle, with rotorcraft visuals instead of plane assets.
 		this.remote = new RemotePlanes( { models: this.visual ? { create: () => new HelicopterVisual( this.app.scene ) } : null } );
 		this.audio = new RotorAudio( this.app );
 		this.hud = opts.hud === false ? null : new HelicopterHUD();
+		this.cockpit = new HelicopterCockpit( this, { canvas: opts.canvas } );
 		const f = this.flight;
 		this.vehicle = {
-			kind: 'helicopter', quaternion: f.quaternion, seat: [ 0.5, 0.96, 0.45 ], eye: [ 0.5, 1.9, 0.65 ], focus: [ 0, 1.5, - 0.6 ], chase: 16,
+			kind: 'helicopter', quaternion: f.quaternion, seat: [ .2, .96, - .2 ], eye: [ .2, 1.96, - .05 ], focus: [ 0, 1.5, - 0.6 ], chase: 16,
 			toWorld: ( l, out ) => f.toWorld( l, out ), drive: dt => this.drive( dt ), exit: () => this.exit(),
 			prompt: () => this.canExit() ? 'Leave helicopter' : null, speed: () => f.velocity.length(), heading: () => f.yaw, seaLevel: () => this.waterAt( f.position.x, f.position.z ),
 		};
@@ -48,14 +53,17 @@ export class Helicopter {
 				prompt: () => 'Recover / repair rescue helicopter · free', onInteract: () => this.recall(),
 			} ) );
 		}
-		if ( features?.on ) this._offs.push( features.on( 'playerDied', () => { if ( this.piloted ) { this.piloted = false; f.engineOn = false; Object.assign( f.controls, { forward: 0, strafe: 0, yaw: 0, lift: 0 } ); } } ) );
+		if ( features?.on ) this._offs.push( features.on( 'playerDied', () => { if ( this.piloted ) { this.piloted = false; this.systems.stop( true ); this.cockpit.close(); Object.assign( f.controls, { forward: 0, strafe: 0, yaw: 0, lift: 0 } ); } } ) );
 		this._syncVisual( 0 );
 	}
 
 	_onFoot() { return [ 'walk', 'deck', 'swim' ].includes( this.app.player?.mode ); }
-	blocked() {
+	blocked( ignoreOwn = false ) {
 		const app = this.app, ui = app.ui?.ui || app.ui, hud = app.game?.hud;
-		return !! ( app.menuOpen || app.menu?.open || app.freeCam || ui?._start || ui?.helpOpen || ui?.panelOpen || ui?.photoMode || app.chat?.isOpen || hud?.invOpen || hud?.standOpen || hud?.rosterOpen || hud?.catchOpen || this.features?.panelOpen?.() );
+		let otherPanel = false;
+		if ( ignoreOwn && this.features?.list ) { for ( const entry of this.features.list.values() ) { const i = entry.instance; if ( i && i !== this && ( typeof i.isOpen === 'function' ? i.isOpen() : i.isOpen ) ) { otherPanel = true; break; } } }
+		else otherPanel = !! this.features?.panelOpen?.();
+		return !! ( app.menuOpen || app.menu?.open || app.freeCam || ui?._start || ui?.helpOpen || ui?.panelOpen || ui?.photoMode || app.chat?.isOpen || hud?.invOpen || hud?.standOpen || hud?.rosterOpen || hud?.catchOpen || otherPanel || ( ! ignoreOwn && this.cockpit?.open ) );
 	}
 	_emit( kind, data = {} ) { this.features?.emit?.( kind, { id: 'helicopter', ...data } ); }
 	_toast( text, ms = 4200 ) { this.app.game?.toast?.( text, ms ); }
@@ -112,7 +120,7 @@ export class Helicopter {
 		f.toWorld( [ 1.35, 0.2, 0.65 ], _door );
 		if ( p.position && ( Math.hypot( p.position.x - _door.x, p.position.z - _door.z ) > 4 || Math.abs( p.position.y - _door.y ) > 3 ) ) return false;
 		if ( p.enterVehicle( this.vehicle ) === false ) return false;
-		this.piloted = true; f.engineOn = true; this._driven = false; this.touch.active = false;
+		this.piloted = true; this.systems.begin(); this._driven = false; this.touch.active = false;
 		this._toast( 'Coastal rescue helicopter · ' + CONTROLS, 9000 ); this._emit( 'helicopterEntered' ); return true;
 	}
 
@@ -134,7 +142,7 @@ export class Helicopter {
 			spot = { x: test.x, y: ground + 0.03, z: test.z }; break;
 		}
 		if ( ! spot ) { this._toast( 'Move farther from the roof edge to leave safely.' ); return false; }
-		this.piloted = false; this._sinceExit = 0; f.engineOn = false; this.touch.active = false;
+		this.piloted = false; this._sinceExit = 0; this.systems.stop( true ); this.systems.session = false; this.cockpit.close(); this.touch.active = false;
 		Object.assign( f.controls, { forward: 0, strafe: 0, yaw: 0, lift: 0, brake: true } );
 		p?.exitVehicle?.( spot.x, spot.y, spot.z, f.yaw + Math.PI / 2, spot.water ? 'swim' : 'walk', spot.water ? this.waterAt( spot.x, spot.z ) : null );
 		this._emit( 'helicopterExited' ); this._save(); return true;
@@ -155,7 +163,31 @@ export class Helicopter {
 		return result;
 	}
 
-	drive( dt ) { if ( ! this.piloted ) return; this._driven = true; Object.assign( this.flight.controls, this._input() ); this._step( dt ); }
+	_keys() {
+		if ( ! this.piloted ) return;
+		const input = this.app.input;
+		if ( this.blocked( true ) ) return;
+		if ( input?.hit?.( 'Digit3' ) ) { this.act( 'panel' ); return; }
+		if ( this.cockpit.open || input?.enabled === false ) return;
+		for ( const [ key, id ] of Object.entries( COCKPIT_KEYS ) ) if ( key !== 'Digit3' && input?.hit?.( key ) ) this.act( id );
+		if ( ! this.systems.running && ! this.systems.starting && ( input?.down?.( 'ShiftLeft' ) || input?.down?.( 'ShiftRight' ) || this.touch.active && this.touch.lift > 0 ) ) this.systems.start( this.hp );
+	}
+	act( id, source = 'panel' ) {
+		if ( ! this.piloted || this.blocked( true ) || ( this.cockpit.open && source !== 'tray' && id !== 'panel' ) ) return false;
+		const s = this.systems; let result = { ok: true, why: '' };
+		if ( id === 'panel' ) { this.cockpit.toggle(); return true; }
+		if ( id === 'engine' ) result = s.running || s.starting ? s.stop() : s.start( this.hp );
+		else if ( id === 'master' ) {
+			if ( s.master && ! this.flight.grounded ) result = { ok: false, why: 'Land before switching off the battery and avionics.' };
+			else { s.master = ! s.master; if ( ! s.master ) s.stop( true ); result.why = 'Battery / avionics ' + ( s.master ? 'on.' : 'off.' ); }
+		} else if ( id === 'hold' ) result = s.toggleHold();
+		else if ( [ 'nav', 'landing', 'search', 'cabin' ].includes( id ) ) { s[ id ] = ! s[ id ]; result.why = id + ' light ' + ( s[ id ] ? 'selected' : 'off' ) + ( ! s.master ? ' · switch on avionics for power.' : '.' ); }
+		else if ( id === 'ack' ) { s.ack(); result.why = 'Warning acknowledged · active caution remains displayed.'; }
+		else return false;
+		s.syncLights(); this.cockpit.elapsed = 1; if ( result.why ) this._toast( result.why );
+		return result.ok;
+	}
+	drive( dt ) { if ( ! this.piloted ) return; this._driven = true; this._keys(); Object.assign( this.flight.controls, this.systems.applyHold( this._input() ) ); this._step( dt ); }
 	_validateRestoredSupport() {
 		const saved = this._pendingSupport;
 		if ( ! saved ) return;
@@ -179,7 +211,7 @@ export class Helicopter {
 	}
 	_step( dt ) {
 		this._validateRestoredSupport();
-		const f = this.flight; f.engineOn = this.piloted && this.hp > 0 && ! f.onWater; f.update( dt );
+		const f = this.flight; this.systems.update( dt, { piloted: this.piloted, hp: this.hp } ); f.update( dt );
 		for ( const e of f.drainEvents() ) {
 			const at = { x: f.position.x, y: f.position.y, z: f.position.z };
 			if ( e.type === 'takeoff' ) { this.stats.flights ++; this._emit( 'helicopterTookOff', at ); }
@@ -194,25 +226,28 @@ export class Helicopter {
 			} else if ( e.type === 'ditched' ) { this.hp = 0; this._toast( 'Helicopter ditched · E to leave · recover at the home helipad.' ); this._emit( 'helicopterDitched', at ); }
 		}
 		if ( f.grounded ) this.lastLanding = [ f.position.x, f.position.y, f.position.z, f.yaw ];
-		if ( this.hp <= 0 ) f.engineOn = false;
+		if ( this.hp <= 0 ) this.systems.stop( true );
 	}
 
 	_syncVisual( dt ) {
 		const f = this.flight; this.visual?.setPose( f.position, f.quaternion ); this.visual?.spin( dt, f.rpm, f );
-		this.audio.update( dt, { running: f.engineOn, rpm: f.rpm, airspeed: f.velocity.length(), x: f.position.x, y: f.position.y + 2, z: f.position.z, inside: this.piloted && this.app.player?.view === 'first' } );
+		this.visual?.setLights( this.systems.lightsMask ); this.systems.syncLights();
+		this.audio.update( dt, { running: f.engineOn, cranking: f.starter, rpm: f.rpm, airspeed: f.velocity.length(), x: f.position.x, y: f.position.y + 2, z: f.position.z, inside: this.piloted && this.app.player?.view === 'first' } );
 	}
 	update( dt ) {
 		this._sinceExit += dt;
-		if ( ! this._driven ) this._step( dt ); this._driven = false;
+		if ( ! this._driven ) { this._keys(); this._step( dt ); } this._driven = false;
 		this._syncVisual( dt );
 		const peers = this.app.remotePlayers?.peers;
 		if ( peers ) this.updateRemote( [ ...peers ].map( ( [ id, p ] ) => ( { id, helicopter: p.extra?.helicopter } ) ), { complete: true } );
 		this.remote.update( dt );
 		this.hud?.update( this );
+		this.cockpit.update( dt );
 	}
 
 	_parkHome() {
 		this._pendingSupport = null;
+		this.systems.reset(); this.cockpit.close();
 		this.hp = 100; this.flight.place( this.home.x, this.home.y, this.home.z, HOME.yaw ); this.lastLanding = [ this.home.x, this.home.y, this.home.z, HOME.yaw ];
 		this._syncVisual( 0 );
 	}
@@ -221,13 +256,14 @@ export class Helicopter {
 		this._parkHome(); this._emit( 'helicopterRecovered' ); this._toast( 'Rescue helicopter serviced and returned to the helipad. E at the cabin to fly.' ); this._save(); return true;
 	}
 	marker() { return { x: this.flight.position.x, z: this.flight.position.z, heading: this.flight.yaw, label: 'Rescue helicopter' }; }
-	view() { return { name: 'Coastal rescue helicopter', piloted: this.piloted, hp: Math.round( this.hp ), altitude: Math.round( this.flight.position.y ), agl: Math.round( this.flight.agl ), speed: Math.round( this.flight.velocity.length() * 3.6 ), verticalSpeed: this.flight.velocity.y, rpm: this.flight.rpm, grounded: this.flight.grounded, home: { x: this.home.x, y: this.home.y, z: this.home.z }, controls: CONTROLS }; }
+	view() { return { name: 'Coastal rescue helicopter', piloted: this.piloted, hp: Math.round( this.hp ), altitude: Math.round( this.flight.position.y ), agl: Math.round( this.flight.agl ), speed: Math.round( Math.hypot( this.flight.velocity.x, this.flight.velocity.z ) * 3.6 ), verticalSpeed: this.flight.velocity.y, rpm: this.flight.rpm, grounded: this.flight.grounded, systems: this.systems.toJSON(), running: this.systems.running, starting: this.systems.starting > 0, hold: !! this.systems.hold, warnings: this.systems.warnings.slice(), home: { x: this.home.x, y: this.home.y, z: this.home.z }, controls: CONTROLS }; }
 	hidesDriver() { return this.piloted && this.app.player?.view === 'first'; }
-	isOpen() { return false; }
+	isOpen() { return !! this.cockpit.open; }
+	close() { this.cockpit.close(); }
 	wantsMouse() { return this.piloted; }
 	decorateState( out ) {
 		const f = this.flight, p = f.position, q = f.quaternion;
-		out.helicopter = { p: [ p.x, p.y, p.z ], q: [ q.x, q.y, q.z, q.w ], rpm: f.rpm, piloted: this.piloted, homeSlot: this.homeSlot };
+		out.helicopter = { p: [ p.x, p.y, p.z ], q: [ q.x, q.y, q.z, q.w ], rpm: f.rpm, piloted: this.piloted, homeSlot: this.homeSlot, lights: this.systems.lightsMask };
 		return out;
 	}
 	updateRemote( states, { complete = false } = {} ) {
@@ -251,12 +287,14 @@ export class Helicopter {
 			fresh.push( { id: s.id, plane: { p: h.p, q: h.q, thr: clamp( h.rpm || 0, 0, 1 ), af: 'helicopter' } } );
 		}
 		this.remote.ingest( fresh );
+		for ( const s of list ) { const r = this.remote.peers.get( s?.id ); if ( r ) { r.lights = Number.isFinite( s.helicopter?.lights ) ? clamp( Math.round( s.helicopter.lights ), 0, 15 ) : 0; r.visual?.setLights?.( r.lights ); if ( r.visual ) r.visual.remoteRPM = clamp( s.helicopter?.rpm || 0, 0, 1 ); } }
 	}
-	toJSON() { return { v: 1, hp: this.hp, homeSlot: this.homeSlot, pose: this.flight.grounded ? [ this.flight.position.x, this.flight.position.y, this.flight.position.z, this.flight.yaw ] : this.lastLanding.slice(), stats: { ...this.stats } }; }
+	toJSON() { return { v: 1, hp: this.hp, homeSlot: this.homeSlot, pose: this.flight.grounded ? [ this.flight.position.x, this.flight.position.y, this.flight.position.z, this.flight.yaw ] : this.lastLanding.slice(), stats: { ...this.stats }, systems: this.systems.toJSON() }; }
 	fromJSON( data ) {
 		if ( ! data || typeof data !== 'object' ) return;
 		if ( this.app.player?.vehicle === this.vehicle ) this.app.player.exitVehicle?.( this.home.x + 2.4, this.home.y + 0.03, this.home.z, 0, 'walk' );
 		this.piloted = false; this.hp = Number.isFinite( data.hp ) ? clamp( data.hp, 0, 100 ) : 100;
+		this.systems.fromJSON( data.systems ); this.cockpit.close();
 		if ( Number.isInteger( data.homeSlot ) && data.homeSlot >= 0 && data.homeSlot < 16 ) { this.homeSlot = data.homeSlot; this.home = this._padAt( data.homeSlot ); this.homeY = this.home.y; }
 		const pose = finitePose( data.pose ) ? data.pose.slice() : [ this.home.x, this.home.y, this.home.z, HOME.yaw ];
 		this.flight.place( ...pose ); this.lastLanding = pose;
@@ -275,7 +313,8 @@ export class Helicopter {
 		this.stats = { flights: 0, landings: 0, hardLandings: 0 }; this._parkHome(); this.remote.dispose(); this.hud?.update( this );
 	}
 	dispose() {
-		this._offs.forEach( off => off?.() ); this.remote.dispose(); this.visual?.dispose(); this.audio.dispose(); this.hud?.dispose();
+		this._offs.forEach( off => off?.() ); this.remote.dispose(); this.cockpit.dispose(); this.visual?.dispose(); this.audio.dispose(); this.hud?.dispose();
+		for ( const light of this.lights ) this.app.localLights?.remove?.( light );
 		for ( const pad of this._pads.values() ) {
 			pad.visual?.dispose();
 			if ( pad.box && this.app.colliders?.boxes ) { const i = this.app.colliders.boxes.indexOf( pad.box ); if ( i >= 0 ) this.app.colliders.boxes.splice( i, 1 ); }

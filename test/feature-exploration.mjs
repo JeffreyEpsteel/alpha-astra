@@ -1,6 +1,6 @@
 // Plain-node test of exploration (src/features/exploration): treasure caches on the real heightmap (shore chests above
 // the tideline of every island, wreck strongboxes in diving depth, the fallen chest under the inverted landmark),
-// discovery, the once-only claim through the E interactable, the chart scrap, the save; the spyglass (G levels, the
+// discovery, the once-only claim through the E interactable, the chart scrap, the save; the spyglass (Backslash levels, the
 // zoomed fov handed back, slowed look, labels for ports and ships, spotting a cache in the middle of the glass, Escape,
 // not while swimming); the heading ribbon (headings, marks). No GPU, no DOM.
 // usage: node test/feature-exploration.mjs
@@ -117,19 +117,19 @@ const run = ( m, s, dt = 0.05 ) => { for ( let k = 0; k < s / dt; k ++ ) m.featu
 	run( m, 0.2 );
 	const sg = m.e.spyglass, cam = m.app.camera;
 	cam.fov = 60; cam.updateProjectionMatrix();
-	m.press( 'KeyG' );
-	ok( sg.level === 1 && Math.abs( cam.fov - 60 / ZOOMS[ 0 ] ) < 1e-9, `G: x${ ZOOMS[ 0 ] } (fov ${ cam.fov })` );
+	m.press( 'Backslash' );
+	ok( sg.level === 1 && Math.abs( cam.fov - 60 / ZOOMS[ 0 ] ) < 1e-9, `Backslash: x${ ZOOMS[ 0 ] } (fov ${ cam.fov })` );
 	ok( m.app.input.sensitivity < 1, 'mouse look slowed while zoomed' );
-	m.press( 'KeyG' );
-	ok( sg.level === 2 && Math.abs( cam.fov - 60 / ZOOMS[ 1 ] ) < 1e-9, `G again: x${ ZOOMS[ 1 ] }` );
-	m.press( 'KeyG' );
+	m.press( 'Backslash' );
+	ok( sg.level === 2 && Math.abs( cam.fov - 60 / ZOOMS[ 1 ] ) < 1e-9, `Backslash again: x${ ZOOMS[ 1 ] }` );
+	m.press( 'Backslash' );
 	ok( sg.level === 0 && cam.fov === 60 && m.app.input.sensitivity === 1, 'a third time: lowered, fov and look handed back' );
 	// labels: look at Pons from the home harbour
 	const pons = WORLD.ports.find( ( p ) => p.id === 'pons' );
 	cam.position.set( 55, 4, 30 );
 	cam.lookAt( pons.stand.x, 6, pons.stand.z );
 	cam.updateMatrixWorld();
-	m.press( 'KeyG' );
+	m.press( 'Backslash' );
 	run( m, 0.1 );
 	ok( sg.labels.some( ( l ) => l.kind === 'port' && l.label === pons.name && l.dist > 500 ), `Pons labelled in the glass (${ sg.labels.map( ( l ) => l.label ).join( ', ' ) })` );
 	const pr = project( cam, { x: pons.stand.x, y: 6, z: pons.stand.z } );
@@ -149,16 +149,16 @@ const run = ( m, s, dt = 0.05 ) => { for ( let k = 0; k < s / dt; k ++ ) m.featu
 	cam.position.set( c.x + 300, 6, c.z + 300 );
 	cam.lookAt( c.x, c.y + 0.5, c.z );
 	cam.updateMatrixWorld();
-	m.press( 'KeyG' );
+	m.press( 'Backslash' );
 	run( m, SPOT_SECONDS + 0.3 );
 	ok( tr.found.has( c.id ) && sg.spotted === 1 && m.toasts.some( ( x ) => /Spotted/.test( x ) ), 'held in the glass: spotted and charted' );
 	m.features.closePanels();
 	ok( sg.level === 0, 'Escape (closePanels) lowers it' );
 	m.app.player.mode = 'swim';
-	m.press( 'KeyG' );
+	m.press( 'Backslash' );
 	ok( sg.level === 0, 'not while swimming' );
 	const other = new Features( {} );
-	other.claimKey( 'KeyG', 'someone' );
+	other.claimKey( 'Backslash', 'someone' );
 	const blocked = other.add( 'exploration', ex );
 	ok( blocked.spyglass.keyOk === false, 'a taken key is reported, not fought over' );
 

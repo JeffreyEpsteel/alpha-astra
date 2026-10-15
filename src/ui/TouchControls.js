@@ -89,7 +89,7 @@ const BUTTONS = {
 export const HELICOPTER_BUTTONS = [ 'heliRise', 'heliDescend', 'heliHover', 'heliLeft', 'heliRight' ];
 export function helicopterButtons( s = {} ) {
 	if ( s.busy || s.mode !== 'helicopter' ) return new Set();
-	const out = new Set( [ ...HELICOPTER_BUTTONS, 'camera' ] );
+	const out = new Set( [ ...HELICOPTER_BUTTONS, 'camera', 'cockpit' ] );
 	if ( promptAction( s.prompt )?.code ) out.add( 'interact' );
 	return out;
 }
@@ -127,8 +127,8 @@ export function nextShot( sel, kinds ) {
 // the driving cluster (wave 22A): the boxes in px for a W x H screen at touch size k (Settings > Touch > size, 0.75..1.4),
 // measured from the safe area's edges: anchor 'br' (ox from the right, oy from the bottom) or 'bl' (ox from the left).
 // rect: the box on a screen without insets. Every target is >= 44 px (48 at the smallest size).
-export const CAR_IDS = [ 'wheel', 'tilt', 'gas', 'brake', 'hand', 'horn', 'exit', 'siren' ];
-export const CAR_LABELS = { tilt: 'Tilt', gas: 'Gas', brake: 'Brake', hand: 'Handbrake', horn: 'Horn', exit: 'Exit', siren: 'Siren' };
+export const CAR_IDS = [ 'wheel', 'tilt', 'cockpit', 'gas', 'brake', 'hand', 'horn', 'exit', 'siren' ];
+export const CAR_LABELS = { tilt: 'Tilt', cockpit: 'Dash', gas: 'Gas', brake: 'Brake', hand: 'Handbrake', horn: 'Horn', exit: 'Exit', siren: 'Siren' };
 export function carLayout( W, H, { k = 1 } = {} ) {
 
 	k = clamp( Number( k ) || 1, 0.75, 1.4 );
@@ -154,6 +154,8 @@ export function carLayout( W, H, { k = 1 } = {} ) {
 	const wh = q( 88 * Math.min( k, Math.max( hs, 0.9 ) ) );
 	bl( 'wheel', m, m, ww, wh );
 	bl( 'tilt', m, m + wh + gap, q( 72 * k ), ex );
+	const stackDash = q( 72 * k ) + gap + q( 48 * k ) > ww;
+	bl( 'cockpit', stackDash ? m : m + q( 72 * k ) + gap, m + wh + gap + ( stackDash ? ex + gap : 0 ), q( 48 * k ), ex );
 	return out;
 
 }
@@ -1180,6 +1182,7 @@ export class TouchControls {
 		C.held.set( e.pointerId, id );
 		const cars = this._feature( 'cars' );
 		if ( id === 'exit' ) this._key( 'KeyE', 'keydown' );
+		else if ( id === 'cockpit' ) this._key( 'Digit3', 'keydown' );
 		else if ( id === 'siren' && cars && cars.toggleSiren ) cars.toggleSiren();
 		else if ( id === 'tilt' ) this._tiltToggle();
 
@@ -1202,6 +1205,7 @@ export class TouchControls {
 		C.held.delete( pointerId );
 		if ( ! [ ...C.held.values() ].includes( id ) ) this.carBtns[ id ].classList.remove( 'is-down' );
 		if ( id === 'exit' ) this._key( 'KeyE', 'keyup' );
+		else if ( id === 'cockpit' ) this._key( 'Digit3', 'keyup' );
 
 	}
 

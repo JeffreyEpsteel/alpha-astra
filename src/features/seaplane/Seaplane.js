@@ -75,6 +75,8 @@ import { SeaplanePanel } from './Panel.js';
 import { Systems, refuelCost, FUEL } from './Systems.js';
 import { Cockpit } from './Cockpit.js';
 import { t } from '../../i18n/index.js';
+import { isOnlineSession } from '../../game/GameMode.js';
+import { AIRPORT_FLEET, findAirport, airportRank, airportStand, AirportSite, lockAirportRank } from './Airport.js';
 
 export const PRICE = 18000;
 export const REPAIR_PER_HP = 15; // $ per point of condition: a full rebuild after a crash is $1,500
@@ -177,6 +179,7 @@ export class Seaplane {
 		this.site = opts.site === false ? null : new SeaplaneSite( { scene, terrain, colliders: this.app.colliders || null, mesh: !! scene } );
 		const strip = this.strip;
 		this.stripSite = strip && opts.site !== false ? new StripSite( { strip, scene, terrain, colliders: this.app.colliders || null, mesh: !! scene } ) : null;
+		this.airportSite = this.airport && scene && opts.site !== false ? new AirportSite( this.airport, scene ) : null;
 		this.models = opts.models && typeof opts.models.create === 'function' ? opts.models : opts.models === false || ! scene ? null : new PlaneModels( { scene } );
 		this.visual = this.models ? this.models.create() : null;
 		this.remote = new RemotePlanes( { models: this.models } );
@@ -222,7 +225,7 @@ export class Seaplane {
 				position: () => f.toWorldXYZ( f.geom.door[ 0 ], f.geom.door[ 1 ], f.geom.door[ 2 ], _v2 ),
 				radius: 3.2,
 				when: () => ! this.piloted && ! this._aboard() && ! this.lost && ! this.chute && this._sinceExit > 0.6, // (not the E that climbed out)
-				prompt: () => ( ! this.owned ? t( 'seaplane.forSale', 'Seaplane for sale · ask at the hangar' ) : this.hp <= 0 ? t( 'seaplane.broken', 'Seaplane · needs repair at the hangar' ) : ( this.airframe && this.airframe.base === 'strip' ? t( 'seaplane.boardPlane', 'Fly the plane' ) : t( 'seaplane.board', 'Fly the seaplane' ) ) ),
+				prompt: () => ( ! this.owned ? t( 'seaplane.forSale', 'Seaplane for sale · ask at the hangar' ) : this.hp <= 0 ? t( 'seaplane.broken', 'Seaplane · needs repair at the hangar' ) : ( this.airframe && this.airframe.land ? t( 'seaplane.boardPlane', 'Fly the plane' ) : t( 'seaplane.board', 'Fly the seaplane' ) ) ),
 				onInteract: () => this.board(),
 			} ) );
 			this._interact.push( this.features.interactable( {
@@ -262,17 +265,26 @@ export class Seaplane {
 				},
 			} ) );
 			// wave 14B: the parked airframes (for sale: their hangar's window; yours: fly it)
-			for ( const slot of [ 'strip', 'ramp' ] ) this._interact.push( this.features.interactable( {
+			for ( const slot of [ 'strip', 'ramp', ...AIRPORT_FLEET.map( ( af ) => 'airport-' + af ) ] ) this._interact.push( this.features.interactable( {
 				id: 'seaplane-parked-' + slot,
 				position: () => ( this.parked.has( slot ) ? this.parked.get( slot ).door : FAR ),
 				radius: 4.0,
-				when: () => ! this.piloted && ! this.chute && this._sinceExit > 0.6 && this.parked.has( slot ),
+				when: () => ! this.piloted && ! this.chute && ! this._aboard() && this._sinceExit > 0.6 && this.parked.has( slot ),
 				prompt: () => this.parkedPrompt( slot ),
 				onInteract: () => this.useParked( slot ),
 			} ) );
 
 		}
 
+		// A marked service point stays at the stand when its aircraft is away or wrecked.
+		if ( this.features?.interactable ) for ( const af of AIRPORT_FLEET ) this._interact.push( this.features.interactable( {
+			id: 'airport-service-' + af,
+			position: () => this.available( af ) ? { ...this.base( af ), x: this.base( af ).x + 5.5 } : FAR,
+			radius: 3.2,
+			when: () => this.available( af ) && ! this.piloted && ! this.chute && ! this._aboard() && this._sinceExit > 0.6,
+			prompt: () => `Take / service ${ AIRFRAMES[ af ].name } · free personal airport aircraft`,
+			onInteract: () => { const r = this.useAirportAircraft( af ); if ( r.text ) this._toast( r.text, 5200 ); },
+		} ) );
 		this._place();
 
 	}
@@ -292,10 +304,16 @@ export class Seaplane {
 
 	}
 
+	get airport() { return findAirport( this.opts.world || WORLD ); }
+
 	// the airframe's base: the ramp's berth or the airstrip's pad
 	base( af = this.af ) {
 
 		const A = AIRFRAMES[ af ] || AIRFRAMES.jade;
+		if ( A.base === 'airport' ) {
+			const p = airportStand( this.airport, af, airportRank( this.app, this.airport ) );
+			if ( p ) return p;
+		}
 		if ( A.base === 'strip' ) {
 
 			const p = stripPad( this.strip );
@@ -311,7 +329,7 @@ export class Seaplane {
 	available( af ) {
 
 		const A = AIRFRAMES[ af ];
-		return !! A && ( A.base !== 'strip' || !! this.strip );
+		return !! A && ( A.base === 'airport' ? !! this.airport && airportRank( this.app, this.airport ) >= 0 : A.base !== 'strip' || !! this.strip );
 
 	}
 
@@ -321,7 +339,11 @@ export class Seaplane {
 	// (not wrecked), else the first for sale; null when one of its own is out, none is had here, or yours are wrecked
 	parkedAt( slot ) {
 
-		const ids = AIRFRAME_IDS.filter( ( id ) => ( AIRFRAMES[ id ].base === 'strip' ) === ( slot === 'strip' ) && this.available( id ) );
+		if ( slot.startsWith( 'airport-' ) ) {
+			const af = slot.slice( 8 );
+			return AIRPORT_FLEET.includes( af ) && this.available( af ) && af !== this.af ? { af, owned: this.owns( af ), courtesy: true } : null;
+		}
+		const ids = AIRFRAME_IDS.filter( ( id ) => AIRFRAMES[ id ].base === slot && this.available( id ) );
 		if ( ! ids.length || ids.includes( this.af ) ) return null;
 		const mine = ids.filter( ( id ) => this.owns( id ) && ! ( this.fleet[ id ] && this.fleet[ id ].lost ) );
 		if ( mine.length ) return { af: mine.includes( this.last[ slot ] ) ? this.last[ slot ] : mine[ 0 ], owned: true };
@@ -340,7 +362,8 @@ export class Seaplane {
 	// the parked airframes follow the fleet: placed, swapped, repainted or removed when it changes
 	_syncParked() {
 
-		for ( const slot of [ 'strip', 'ramp' ] ) {
+		if ( this.airportSite ) this.airportSite.setRank( airportRank( this.app, this.airport ) );
+		for ( const slot of [ 'strip', 'ramp', ...AIRPORT_FLEET.map( ( af ) => 'airport-' + af ) ] ) {
 
 			const want = this.parkedAt( slot );
 			let w = this.parked.get( slot );
@@ -353,7 +376,7 @@ export class Seaplane {
 			}
 
 			const rec = this.fleet[ want.af ];
-			const liv = want.owned && rec && rec.upgrades ? ( rec.upgrades.livery | 0 ) : 0;
+			const liv = want.owned && rec && rec.upgrades ? ( rec.upgrades.livery | 0 ) : ( AIRFRAMES[ want.af ].livery || 0 );
 			const b = this.base( want.af ), g = b.kind === 'strip' ? this._groundAt( b.x, b.z ) : NaN;
 			const y = Number.isFinite( g ) ? g : b.y;
 			const sig = `${ want.af }|${ want.owned }|${ liv }|${ b.x }|${ y }|${ b.z }|${ b.heading }`;
@@ -371,7 +394,7 @@ export class Seaplane {
 			// the E spot: beside the door (port side), on the apron / the jetty where a player stands
 			const dr = composeSpec( want.af ).geom.door || GEOM.door, c = Math.cos( b.heading ), sn = Math.sin( b.heading );
 			const door = { x: b.x + dr[ 0 ] * c + dr[ 2 ] * sn, y: b.kind === 'strip' ? y : SITE.jetty.y, z: b.z - dr[ 0 ] * sn + dr[ 2 ] * c };
-			Object.assign( w, { af: want.af, owned: want.owned, liv, x: b.x, y, z: b.z, heading: b.heading, door, sig } );
+			Object.assign( w, { af: want.af, owned: want.owned, courtesy: !! want.courtesy, liv, x: b.x, y, z: b.z, heading: b.heading, door, sig } );
 
 		}
 
@@ -382,6 +405,10 @@ export class Seaplane {
 		const w = this.parked.get( slot );
 		if ( ! w ) return null;
 		const name = AIRFRAMES[ w.af ].name;
+		if ( w.courtesy ) {
+			const r = this.fleet[ w.af ];
+			return r?.lost || r?.hp <= 0 ? `Recover ${ name } · courtesy airport service` : `Fly ${ name } · your courtesy aircraft`;
+		}
 		if ( w.owned ) return t( 'seaplane.parkedFly', 'Fly the {name}', { name } );
 		return slot === 'strip' ? t( 'seaplane.parkedSaleStrip', '{name} for sale · ask at the airstrip hangar', { name } ) : t( 'seaplane.parkedSaleRamp', '{name} for sale · ask at the hangar', { name } );
 
@@ -391,7 +418,8 @@ export class Seaplane {
 	useParked( slot ) {
 
 		const w = this.parked.get( slot );
-		if ( ! w || this.piloted || this.chute ) return { ok: false, text: '' };
+		if ( ! w || this.piloted || this.chute || this._aboard() ) return { ok: false, text: '' };
+		if ( w.courtesy ) return this.useAirportAircraft( w.af );
 		if ( ! w.owned ) {
 
 			this.open( slot === 'strip' ? 'strip' : 'ramp' );
@@ -411,6 +439,34 @@ export class Seaplane {
 
 	}
 
+	// Exact personal stand positions for map discovery; no guessed airport pin.
+	airportMarkers() {
+		return AIRPORT_FLEET.filter( ( af ) => this.available( af ) ).map( ( af ) => ( {
+			id: 'airport-' + af, name: AIRFRAMES[ af ].name + ' · airport courtesy aircraft',
+			...airportStand( this.airport, af, airportRank( this.app, this.airport ) ), available: true, claimed: this.owns( af ),
+		} ) );
+	}
+
+	// Issues only this captain's aircraft. Remote network models have no E interaction.
+	// Retrieving/services the same fleet record; cargo and fitted upgrades survive.
+	useAirportAircraft( af ) {
+		if ( ! AIRPORT_FLEET.includes( af ) || ! this.available( af ) || this.piloted || this.chute || this._aboard() ) return { ok: false, text: '' };
+		if ( airportRank( this.app, this.airport, true ) < 0 ) return { ok: false, text: 'Airport apron is occupied; wait for a clear stand' };
+		const p = this.app.player?.position, stand = this.base( af );
+		if ( ! p || Math.hypot( p.x - stand.x, p.z - stand.z ) > 12 ) return { ok: false, text: 'Go to the aircraft stand at Meridian Airport' };
+		lockAirportRank( this.app );
+		if ( af === this.af ) this._stash();
+		const r = this.fleet[ af ] || { upgrades: { ...defaultUpgrades(), livery: AIRFRAMES[ af ].livery }, cargo: [] };
+		Object.assign( r, { owned: true, hp: MAX_HP, fuel: 1, lost: false, sprung: [ 0, 0 ], engineFail: [] } );
+		this.fleet[ af ] = r;
+		if ( af === this.af ) { this._clearWreck(); this._unstash( af ); this._place(); }
+		else { const result = this.takeOut( af ); if ( ! result.ok ) return result; }
+		this._save();
+		const result = { ok: true, boarded: this.board(), text: `${ AIRFRAMES[ af ].name }: O starts · Shift / C throttle · follow the yellow line to the runway, turn toward its longer end · S lifts the nose · V cockpit` };
+		this._toast( result.text, 5200 );
+		return result;
+	}
+
 	// where a delivered plane goes (takeOut / recall at): 'home', 'strip' or nothing -> its own base (the ramp's berth
 	// for a seaplane, the pad for the Kestrel: a floatplane is not left on the pad, a land plane does not float);
 	// { x, z, heading, water: true } -> a bay where a seaplane floats moored (a land plane: its base); { x, z } without
@@ -420,7 +476,7 @@ export class Seaplane {
 		const A = AIRFRAMES[ af ] || AIRFRAMES.jade, b = this.base( af );
 		if ( ! at || typeof at !== 'object' || ! Number.isFinite( at.x ) || ! Number.isFinite( at.z ) ) return b;
 		const heading = Number.isFinite( at.heading ) ? at.heading : 0;
-		if ( A.base !== 'strip' ) return { kind: 'bay', x: at.x, z: at.z, heading, y: - 0.2 };
+		if ( ! A.land ) return { kind: 'bay', x: at.x, z: at.z, heading, y: - 0.2 };
 		if ( at.water === true ) return b;
 		return { kind: 'ground', x: at.x, z: at.z, heading, y: Number.isFinite( at.y ) ? at.y : 0 };
 
@@ -479,8 +535,8 @@ export class Seaplane {
 
 		const t = this.terrain;
 		let g = t && t.heightAt ? t.heightAt( x, z ) : - Infinity;
-		const s = this.strip;
-		if ( s && Number.isFinite( s.y ) && onStrip( s, x, z, 1 ) ) g = Math.max( g, s.y );
+		for ( const s of [ this.strip, this.airport ] ) if ( s && Number.isFinite( s.y ) && onStrip( s, x, z, 1 ) ) g = Math.max( g, s.y );
+		if ( this.airport && AIRPORT_FLEET.some( ( af ) => { const b = this.base( af ); return Math.abs( b.x - x ) < 9 && Math.abs( b.z - z ) < 12; } ) ) g = Math.max( g, this.airport.y );
 		// Meridian's walkable roofs exist only while their buildings remain standing.
 		// Query below the airframe's current keel height so flying below a roof never
 		// creates a spring all the way up to the top of a skyscraper.
@@ -549,8 +605,9 @@ export class Seaplane {
 
 		const r = this.fleet[ af ] || { owned: false };
 		this.af = af;
-		this.last[ AIRFRAMES[ af ] && AIRFRAMES[ af ].base === 'strip' ? 'strip' : 'ramp' ] = af;
+		if ( AIRFRAMES[ af ].base !== 'airport' ) this.last[ AIRFRAMES[ af ].base ] = af;
 		this.owned = r.owned === true;
+		if ( this.owned && AIRFRAMES[ af ].base === 'airport' ) lockAirportRank( this.app );
 		this.hp = Number.isFinite( r.hp ) ? Math.max( 0, Math.min( MAX_HP, r.hp ) ) : MAX_HP;
 		this.flight.fuel = Number.isFinite( r.fuel ) ? Math.max( 0, Math.min( 1, r.fuel ) ) : 1;
 		if ( r.switches && this.systems ) this.systems.fromJSON( r.switches );
@@ -643,8 +700,13 @@ export class Seaplane {
 	cargoPort() {
 
 		const f = this.flight, x = f.position.x, z = f.position.z;
-		if ( this.home ) return 'home';
-		for ( const p of WORLD.ports || [] ) {
+		if ( ! this.owned || this.lost || f.airborne || f.airspeed >= 2 ) return null;
+		const ports = ( this.opts.world || WORLD ).ports || [];
+		if ( this.home ) {
+			const port = this.airframe.base === 'airport' ? this.airport?.island : this.airframe.base === 'strip' ? this.strip?.island : 'home';
+			return port === 'home' || ports.some( ( p ) => p.id === port ) ? port : null;
+		}
+		for ( const p of ports ) {
 
 			const q = [ p.dock && p.dock.position, p.stand, p.center ];
 			for ( let k = 0; k < 2; k ++ ) if ( q[ k ] && Math.hypot( q[ k ].x - x, q[ k ].z - z ) < 90 ) return p.id;
@@ -775,7 +837,7 @@ export class Seaplane {
 		const fuel = this.flight.fuel, fuelCost = refuelCost( fuel, this.free, litres ), s = this.systems, f = this.flight;
 		const price = this.airframe.price;
 		// wave 12: the hangar's airframes for this scope (the ramp: the seaplanes; the strip: the Kestrel)
-		const airframes = AIRFRAME_IDS.filter( ( id ) => ( AIRFRAMES[ id ].base === 'strip' ) === ( scope === 'strip' ) && this.available( id ) ).map( ( id ) => {
+		const airframes = AIRFRAME_IDS.filter( ( id ) => AIRFRAMES[ id ].base === scope && this.available( id ) ).map( ( id ) => {
 
 			const A = AIRFRAMES[ id ], owned = this.owns( id ), rec = id === this.af ? null : this.fleet[ id ];
 			const price = this.airframePrice( id );
@@ -794,7 +856,7 @@ export class Seaplane {
 
 		} );
 		return {
-			scope, af: this.af, name: this.airframe.name, airframes, upgrades, inScope: ( this.airframe.base === 'strip' ) === ( scope === 'strip' ),
+			scope, af: this.af, name: this.airframe.name, airframes, upgrades, inScope: this.airframe.base === scope,
 			cargo: { crates: this.cargoCrates(), capacity: this.capacity(), kg: Math.round( cargoMass( this.cargo ).kg ), items: this.cargo.map( ( c ) => ( { good: c.good, name: GOODS[ c.good ] ? GOODS[ c.good ].name : c.good, qty: c.qty } ) ) },
 			engineOut: f.engineFail.some( Boolean ),
 			owned: this.owned, free: this.free, price, money, hp: this.hp, home: this.home, piloted: this.piloted,
@@ -818,7 +880,7 @@ export class Seaplane {
 	open( scope = null ) {
 
 		if ( scope ) this.panel.scope = scope;
-		else if ( ! this.piloted ) this.panel.scope = this.airframe.base === 'strip' ? 'strip' : 'ramp';
+		else if ( ! this.piloted ) this.panel.scope = this.airframe.base;
 		return this.panel.open();
 
 	}
@@ -863,6 +925,7 @@ export class Seaplane {
 	buy( af = null ) {
 
 		af = af || this.af;
+		if ( AIRPORT_FLEET.includes( af ) ) return this.useAirportAircraft( af );
 		const A = AIRFRAMES[ af ];
 		if ( ! A ) return { ok: false, text: '' };
 		if ( this.owns( af ) ) return { ok: false, text: t( 'seaplane.owned', 'The seaplane is already yours' ) };
@@ -959,13 +1022,15 @@ export class Seaplane {
 	_save() {
 
 		const st = this.features && this.features.state;
-		if ( st && st.save ) try { st.save(); } catch ( e ) { /* the next autosave keeps it */ }
+		if ( isOnlineSession( this.app ) && ! st?.storage?.universe ) return false;
+		if ( st && st.save ) try { return st.save(); } catch ( e ) { /* the next autosave keeps it */ }
 
 	}
 
 	_place( at = null ) {
 
 		const f = this.flight, b = this.spot( at );
+		this.parkBrake = false;
 		if ( b.kind === 'strip' || b.kind === 'ground' ) {
 
 			// on the pad (or a stand), nose down the runway, the wheels on the ground (brakes set)
@@ -992,7 +1057,7 @@ export class Seaplane {
 	board() {
 
 		const p = this.app.player;
-		if ( this.piloted ) return false;
+		if ( this.piloted || ( p && p.mode === 'plane' ) ) return false;
 		if ( ! this.owned || this.hp <= 0 || this.lost ) {
 
 			this.open();
@@ -1025,7 +1090,7 @@ export class Seaplane {
 	_aboard() {
 
 		const p = this.app.player;
-		return !! p && [ 'boat', 'deck', 'seat', 'ride' ].includes( p.mode );
+		return !! p && [ 'boat', 'deck', 'seat', 'ride', 'plane' ].includes( p.mode );
 
 	}
 
@@ -1133,11 +1198,16 @@ export class Seaplane {
 	drive( dt ) {
 
 		this._driven = true;
-		const keys = this._keysNow(), pad = this._padNow();
+		const panelOpen = () => this.isOpen() || !! this.features?.panelOpen?.();
+		const wasModal = panelOpen();
 		this._cockpitKeys();
+		// 3 may open or close the tray in this frame. In either transition the
+		// modal owns the frame; a held pad trigger/stick must not leak through.
+		const modal = wasModal || panelOpen();
+		const keys = modal ? {} : this._keysNow(), pad = modal ? null : this._padNow();
 		// opening the throttle with the engine off cranks it (the touch lever and a pad trigger have no START key)
 		const f = this.flight;
-		if ( ! f.engineOn && ! this.systems.cranking && f.fuel > 0 && ( keys.throttleUp || ( pad && pad.throttle > 0.3 ) ) && this.autoCrank ) this.act( 'engine', 'throttle' );
+		if ( ! modal && ! f.engineOn && ! this.systems.cranking && f.fuel > 0 && ( keys.throttleUp || ( pad && pad.throttle > 0.3 ) ) && this.autoCrank ) this.act( 'engine', 'throttle' );
 		this.pilot.read( keys, pad, f, dt );
 		// the wheel brakes (a land plane on the ground: B held, or the throttle closed and nearly stopped)
 		f.controls.brake = f.geom.wheels && f.grounded && ( keys.brake || this.parkBrake || ( this.pilot.throttle < 0.02 && f.airspeed < 0.6 ) ) ? 1 : 0;
@@ -2325,7 +2395,7 @@ export class Seaplane {
 		const af = AIRFRAMES[ d.af ] && this.available( d.af ) ? d.af : 'jade';
 		// wave 14B: which airframe stands at each base (the one last out there)
 		if ( d.last && typeof d.last === 'object' ) for ( const k of [ 'ramp', 'strip' ] ) if ( AIRFRAMES[ d.last[ k ] ] && ( AIRFRAMES[ d.last[ k ] ].base === 'strip' ) === ( k === 'strip' ) ) this.last[ k ] = d.last[ k ];
-		this.last[ AIRFRAMES[ af ].base === 'strip' ? 'strip' : 'ramp' ] = af;
+		if ( AIRFRAMES[ af ].base !== 'airport' ) this.last[ AIRFRAMES[ af ].base ] = af;
 		if ( af !== this.af ) {
 
 			this._clearWreck();
@@ -2341,6 +2411,7 @@ export class Seaplane {
 		this.flight.engineFail.forEach( ( _, i ) => ( this.flight.engineFail[ i ] = ef[ i ] === true ) );
 		this.abandoned = false;
 		this.owned = d.owned === true;
+		if ( this.owned && AIRFRAMES[ af ].base === 'airport' ) lockAirportRank( this.app );
 		this.hp = Number.isFinite( d.hp ) ? Math.max( 0, Math.min( MAX_HP, d.hp ) ) : MAX_HP;
 		this.flight.fuel = Number.isFinite( d.fuel ) ? Math.max( 0, Math.min( 1, d.fuel ) ) : 1; // (older saves: a full tank)
 		this.systems.fromJSON( d.switches );
@@ -2401,6 +2472,7 @@ export class Seaplane {
 		this._clearWreck();
 		if ( this.chute ) this.chute.dispose();
 		if ( this.stripSite ) this.stripSite.dispose();
+		if ( this.airportSite ) this.airportSite.dispose();
 		this.stun.dispose();
 		this.cockpit.dispose();
 		this.panel.dispose();

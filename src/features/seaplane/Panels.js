@@ -305,7 +305,26 @@ function kestrel() {
 
 }
 
-export const LAYOUTS = { jade: jade(), petrel: petrel(), albatross: albatross(), kestrel: kestrel() };
+function swift() {
+	const l = kestrel();
+	l.id = 'swift'; l.name = 'Swift';
+	l.theme = { ...l.theme, paint: '#3b321a', plateInk: '#ffe095', needle: '#ffdc72' };
+	l.items = l.items.map( ( i ) => i.id === 'gs' ? deco( 'placard', B( i.x, i.y, i.w, i.h ), { lines: [ 'SWIFT TRAINER' ], px: 11 } ) : i );
+	l.strip = [ [ 'gear', 'Gear' ] ];
+	return finish( l );
+}
+
+function courier() {
+	const l = albatross();
+	l.id = 'courier'; l.name = 'Meridian Courier';
+	l.theme = { ...l.theme, paint: '#17263b', plateInk: '#e5cd7c' };
+	l.items = l.items.map( ( i ) => i.id === 'ftrim' ? C( 'gear', 'gear', B( 658, 218, 120, 78 ) ) : i.id === 'rudderLamp' ? C( 'brakeLamp', 'lamp', B( i.x, i.y, i.w, i.h ), { lamp: 'brake' } ) : i.kind === 'placard' ? deco( 'placard', B( 786, 214, 230, 44 ), { lines: [ 'MERIDIAN COURIER  ·  LAND TWIN', 'ROTATE 30 m/s  ·  VNE 80 m/s' ], px: 12, bail: true } ) : i );
+	l.items.push( SW.brake( B( 786, 264, 72, 64 ) ) );
+	l.strip.push( [ 'gear', 'Gear' ] );
+	return finish( l );
+}
+
+export const LAYOUTS = { jade: jade(), petrel: petrel(), albatross: albatross(), kestrel: kestrel(), swift: swift(), courier: courier() };
 export const THEME = THEMES;
 
 export function layoutFor( af ) {

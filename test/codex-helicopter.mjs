@@ -63,7 +63,7 @@ function world( render = false ) {
 	check( camera.position.distanceTo( h.flight.toWorld( h.vehicle.eye ) ) < 0.001, 'V/first-person camera occupies the real canopy cockpit eye' );
 	check( h.visual.mainRotor.rotation.y !== 0 && h.visual.tailRotor.rotation.x !== 0, 'both rotors visibly animate after spooling' );
 	const visibleTriangles = h.visual.geometries.reduce( ( sum, g ) => sum + ( g.index?.count || g.attributes.position.count ) / 3, 0 );
-	check( visibleTriangles > 2000 && visibleTriangles < 20000 && h.visual.gauges.length === 4, `authored rescue aircraft includes cabin/skids/rotors/live instruments (${ visibleTriangles } triangles)` );
+	check( visibleTriangles > 2000 && visibleTriangles < 20000 && h.visual.cyclic && h.visual.collective && h.visual.pedals.length === 2 && h.visual.meshes.every( m => ! m.name.includes( 'instrument-needle' ) ), `authored rescue aircraft includes cabin/skids/rotors/working controls with redundant gauges removed (${ visibleTriangles } triangles)` );
 	check( h.visual.meshes.find( m => m.name === 'bubble-canopy' )?.material.transparent, 'native renderer material supports transparent cockpit canopy' );
 	input.keys.add( 'KeyC' ); for ( let i = 0; i < 1200 && ! h.flight.grounded; i ++ ) tick(); input.keys.clear();
 	check( h.flight.grounded && h.hp === 100 && h.stats.landings === 1, 'normal descent safely lands the actual feature without damage' );

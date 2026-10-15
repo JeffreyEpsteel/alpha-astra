@@ -1178,6 +1178,13 @@ export class WorldMap {
 
 		// the seaplane, the boat when the player is not aboard, the other players
 		const sp = feats && feats.get && feats.get( 'seaplane' );
+		if ( F.discovered( 'meridian' ) && sp?.airportMarkers ) for ( const stand of sp.airportMarkers() ) {
+
+			add( stand.id, 'plane', ICON.plane, stand.x, stand.z, {
+				label: `${ stand.name } · ${ stand.available ? 'airport pickup' : 'airport service' }`,
+			} );
+
+		}
 		let pl = null;
 		try { pl = sp && sp.marker ? sp.marker() : null; } catch ( e ) { pl = null; }
 		const afName = sp && typeof sp.af === 'string' && sp.af ? sp.af[ 0 ].toUpperCase() + sp.af.slice( 1 ) : '';

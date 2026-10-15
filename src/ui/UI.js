@@ -1888,6 +1888,7 @@ export const CONTROLS = [
 		{ k: [ 'RMB' ], text: 'Reel in an empty line, guard in a fight' },
 		{ k: [ 'evade' ], text: 'Evade (dodge)' },
 		{ k: [ 'light' ], text: 'Flashlight' },
+		{ k: [ 'Backslash' ], text: 'Spyglass: raise, zoom, lower' },
 		{ k: [ 'emote' ], text: 'Emotes', small: '1-4: wave, dance, point, cheer' },
 	] },
 	{ id: 'helm', title: 'At the helm', rows: [
@@ -1897,6 +1898,7 @@ export const CONTROLS = [
 		{ k: [ 'interact' ], text: 'Leave the helm, step ashore' },
 		{ k: [ 'view' ], text: 'Boat camera', small: '1st / 3rd person' },
 		{ k: [ 'light' ], text: 'Boat lights' },
+		{ k: [ 'Backslash' ], text: 'Spyglass: raise, zoom, lower' },
 		{ k: [ 'portGuns', 'starboardGuns' ], text: 'Fire the port / starboard guns' },
 		{ k: [ 'board' ], text: 'Board or retreat', small: 'When a ship is alongside' },
 	] },
@@ -1915,7 +1917,15 @@ export const CONTROLS = [
 		{ k: [ 'RMB', 'LMB' ], text: 'Aim, fire', small: 'With a gun drawn' },
 		{ k: [ 'rod' ], text: 'Reload', small: 'With a gun drawn' },
 	] },
-	{ id: 'cockpit', title: 'Cockpit', rows: [
+	{ id: 'car', title: 'Car interior', rows: [
+		{ k: [ 'forward', 'back' ], text: 'Accelerate / brake and reverse' },
+		{ k: [ 'left', 'right' ], text: 'Steer' },
+		{ k: [ 'view' ], text: 'Driver eye / chase camera' },
+		{ k: [ 'Digit3' ], text: 'Dashboard controls', small: 'Working switches and live instruments' },
+		{ k: [ 'KeyL', 'KeyH' ], text: 'Headlights, horn' },
+		{ k: [ 'interact' ], text: 'Enter / leave car', small: 'Stop before leaving' },
+	] },
+	{ id: 'cockpit', title: 'Airplane cockpit', rows: [
 		{ k: [ 'sprint', 'dive' ], text: 'Throttle up / down' },
 		{ k: [ 'forward', 'back' ], text: 'Nose down / up' },
 		{ k: [ 'left', 'right' ], text: 'Bank, steer while taxiing' },
@@ -1926,6 +1936,7 @@ export const CONTROLS = [
 		{ k: [ 'KeyN', 'Semicolon' ], text: 'Nav lights, landing light' },
 		{ k: [ 'KeyY' ], text: 'Autopilot' },
 		{ k: [ 'Digit3' ], text: 'Cockpit switches' },
+		{ k: [ 'interact' ], text: 'Take an airport aircraft', small: 'Swift trainer and Meridian Courier at Meridian airport stands' },
 		{ k: [ 'Quote' ], text: 'Bail out', small: 'Press twice, high enough' },
 		{ k: [ 'board' ], text: 'Wheel brakes', small: 'The Kestrel, on the ground' },
 		{ k: [ 'interact' ], text: 'Climb out', small: 'Slow, on the water or the ground' },
@@ -1937,6 +1948,10 @@ export const CONTROLS = [
 		{ k: [ 'sprint', 'dive' ], text: 'Rise / descend' },
 		{ k: [ 'jump' ], text: 'Hover / brake', small: 'Release movement to hold position' },
 		{ k: [ 'view' ], text: 'Cockpit / chase camera' },
+		{ k: [ 'Digit3' ], text: 'Helicopter systems', small: 'Clickable switches and live flight instruments' },
+		{ k: [ 'KeyO', 'KeyU' ], text: 'Engine starter, avionics master' },
+		{ k: [ 'KeyY' ], text: 'Position hover hold', small: 'Movement disengages hold' },
+		{ k: [ 'KeyN', 'Semicolon' ], text: 'Navigation lights, landing light' },
 		{ k: [ 'interact' ], text: 'Enter / leave helicopter', small: 'Land and stop before leaving. Free recovery at the home helipad' },
 	] },
 	{ id: 'swim', title: 'Swimming', rows: [
@@ -1983,7 +1998,14 @@ export const TOUCH_CONTROLS = [
 		{ chip: 'Board', text: 'Board or retreat', small: 'When a ship is alongside' },
 		{ chip: 'Lights', text: 'Boat lights' },
 	] },
-	{ id: 'air', title: 'Seaplane', rows: [
+	{ id: 'car', title: 'Car interior', rows: [
+		{ chip: 'Gas / Brake', text: 'Accelerate, stop and reverse' },
+		{ chip: 'Steering slider', text: 'Steer; Tilt enables motion steering' },
+		{ chip: 'Dash', text: 'Working dashboard controls and live instruments' },
+		{ chip: 'Horn / Handbrake', text: 'Sound the horn / hold the handbrake' },
+		{ chip: 'Exit', text: 'Leave after stopping' },
+	] },
+	{ id: 'air', title: 'Airplane', rows: [
 		{ chip: 'Lever', text: 'Throttle; drag the right side: nose up / down, bank' },
 		{ chip: 'Cockpit', text: 'Cockpit switches' },
 		{ chip: 'Nav', text: 'Nav lights, landing light' },
@@ -1996,6 +2018,7 @@ export const TOUCH_CONTROLS = [
 		{ chip: 'Hover / brake', text: 'Hold to stop and hover' },
 		{ chip: 'Slide left / right', text: 'Hold to move sideways' },
 		{ chip: 'View', text: 'Cockpit / chase camera' },
+		{ chip: 'Cockpit', text: 'Helicopter systems', small: 'Engine, avionics, lights and hover hold' },
 		{ chip: 'Wide button', text: 'Enter / leave helicopter', small: 'Land and stop before leaving. Free recovery at the home helipad' },
 	] },
 	{ id: 'top', title: 'Top right', rows: [

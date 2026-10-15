@@ -32,3 +32,5 @@ export { ParkedPlane, RemotePlanes } from './Remote.js';
 export { MOOR_RADIUS, STRIP_TIP_RANGE } from './Seaplane.js';
 
 export default { install };
+
+export { AIRPORT_FLEET, findAirport, airportRank, airportStand, AirportSite, buildAirportStandGeometry } from './Airport.js';

@@ -433,7 +433,8 @@ export function sanitizeHelicopter( h ) {
 	if ( len < 1e-6 || ! Number.isFinite( len ) ) return undefined;
 	return { p: h.p.map( v => round( v, 100 ) ), q: h.q.map( v => round( v / len, 1e4 ) ),
 		rpm: round( num( h.rpm, 0, 1 ), 100 ), piloted: h.piloted === true,
-		homeSlot: Math.round( num( h.homeSlot, 0, 15 ) ) };
+		homeSlot: Math.round( num( h.homeSlot, 0, 15 ) ),
+		...( h.lights === undefined ? {} : { lights: Math.round( num( h.lights, 0, 15, 0 ) ) } ) };
 
 }
 

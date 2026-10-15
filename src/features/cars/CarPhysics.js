@@ -112,7 +112,8 @@ export class CarBody {
 		const lx = fz, lz = - fx; // the car's left
 		let vf = this.vx * fx + this.vz * fz;
 		let vl = this.vx * lx + this.vz * lz;
-		const throttle = clamp( inp.throttle || 0, 0, 1 ), brake = clamp( inp.brake || 0, 0, 1 ), hb = !! inp.handbrake;
+		const engineOn = inp.engineOn !== false;
+		const throttle = engineOn ? clamp( inp.throttle || 0, 0, 1 ) : 0, brake = clamp( inp.brake || 0, 0, 1 ), hb = !! inp.handbrake;
 
 		// the wheels turn toward the stick, less lock as the speed rises
 		const lock = S.steer / ( 1 + Math.abs( vf ) * 0.045 );
@@ -134,7 +135,8 @@ export class CarBody {
 			if ( brake > 0 ) {
 
 				if ( vf > 0.4 ) a -= Math.min( S.brake, vf / h ) * brake;
-				else if ( throttle === 0 && vf > - S.rev ) a -= S.accel * 0.7 * brake; // reverse
+				else if ( engineOn && throttle === 0 && vf > - S.rev ) a -= S.accel * 0.7 * brake; // reverse
+				else if ( ! engineOn && vf < - 0.05 ) a += Math.min( S.brake, - vf / h ) * brake;
 
 			}
 

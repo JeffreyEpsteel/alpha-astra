@@ -10,7 +10,7 @@ import { PROTOCOL_VERSION } from '../src/net/Protocol.js';
 import { Helicopter } from '../src/features/helicopter/Helicopter.js';
 
 const root = resolve( dirname( fileURLToPath( import.meta.url ) ), '..' );
-const reportDir = join( root, 'reports', 'codex-20261015', 'helicopter-network' );
+const reportDir = join( root, 'reports', 'codex-20261015', 'network-cockpit' );
 mkdirSync( reportDir, { recursive: true } );
 const syntheticDir = mkdtempSync( join( reportDir, 'synthetic-' ) );
 const receipt = { startedAt: new Date().toISOString(), transport: 'real Colyseus over WebSocket', host: '127.0.0.1', requestedPort: 0, syntheticDir, checks: [], observedStates: [], cleanup: {} };
@@ -25,6 +25,14 @@ const check = ( condition, label, evidence = undefined ) => {
 const makeAircraft = id => {
 	const features = { get: name => name === 'netsync' ? { id } : null };
 	const h = new Helicopter( { terrainData: { heightAt: () => 1 } }, features, { render: false, hud: false } );
+	// Record the actual feature->remote visual calls without creating GPU resources.
+	// Transforms/light states fed to this adapter come exclusively from received wire data.
+	h.remote.models = { create() { return { calls: [], mask: null, lamps: [], disposed: false,
+		setPose( p, q ) { this.calls.push( { kind: 'pose', p: p.toArray(), q: q.toArray() } ); },
+		spin( dt, rpm ) { this.calls.push( { kind: 'spin', dt, rpm } ); },
+		setLights( mask ) { this.mask = mask; this.lamps = [ 1, 1, 2, 4, 8 ].map( bit => ( { bit, visible: !! ( mask & bit ) } ) ); this.calls.push( { kind: 'lights', mask } ); },
+		dispose() { this.disposed = true; this.calls.push( { kind: 'dispose' } ); },
+	}; } };
 	helicopters.push( h ); return h;
 };
 const playerState = ( helicopter, marker, mode = 'seat' ) => helicopter.decorateState( { t: 'state', p: [ marker, 2, - 60 ], yaw: 0, mode, action: mode === 'seat' ? 'seated' : null, character: 'pepe', grounded: mode === 'walk', speed: 0, vy: 0, boat: null } );
@@ -58,15 +66,33 @@ try {
 	const aId = wa.id, bId = wb.id; receipt.peerIds = { aId, bId };
 	check( aId !== bId && wb.peers.some( p => p.id === aId ) && wb.host === aId, 'two real clients join and agree on first pilot host' );
 	const hA = makeAircraft( aId ), hB = makeAircraft( bId );
+	Object.assign( hA.systems, { nav: true, landing: true, search: true, cabin: true } ); hA.systems.syncLights();
 	hA.flight.place( 84.123, 104.456, - 75.789, 0.7 ); hA.flight.rpm = 0.82; hA.piloted = true;
 	A.send( playerState( hA, 100 ) ); const flying = await receivedState( B, aId, 100 );
 	check( flying.mode === 'seat' && flying.action === 'seated' && flying.helicopter?.piloted === true, 'seat-mode helicopter pilot is accepted and reaches the other client' );
 	check( flying.helicopter.p[ 0 ] === 84.12 && flying.helicopter.p[ 1 ] === 104.46 && flying.helicopter.rpm === 0.82, 'aircraft extra pose and rotor state survive real server sanitizer/schema/transport', flying.helicopter );
+	check( flying.helicopter.lights === 15, 'all four real cockpit lighting bits pass server sanitizer/schema and reach the second client', flying.helicopter.lights );
 	hB.updateRemote( [ flying ] );
 	check( hB.remote.peers.has( aId ) && hB.remote.count === 1, 'received flying state feeds actual Helicopter remote lifecycle' );
-	const normalized = playerState( hA, 101 ); normalized.helicopter.q = [ 0, 0, 0, 4 ]; normalized.helicopter.rpm = 8;
+	const visual = hB.remote.peers.get( aId ).visual; hB.remote.update( .016 );
+	check( visual.mask === 15 && visual.lamps.length === 5 && visual.lamps.every( l => l.visible ) && visual.calls.some( c => c.kind === 'pose' ), 'actual remote feature applies received cockpit lights to every lamp and draws received pose', visual.calls );
+	const normalized = playerState( hA, 101 ); normalized.helicopter.q = [ 0, 0, 0, 4 ]; normalized.helicopter.rpm = 8; normalized.helicopter.lights = 31.8;
 	A.send( normalized ); const capped = await receivedState( B, aId, 101 );
 	check( capped.helicopter.q[ 3 ] === 1 && capped.helicopter.rpm === 1, 'server normalizes remote helicopter quaternion and caps rotor speed' );
+	check( capped.helicopter.lights === 15, 'server caps excessive cockpit lighting masks to four bits' );
+	const lightCases = [
+		[ 'negative mask', - 7, 0 ], [ 'fractional mask', 7.6, 8 ], [ 'search + navigation mask', 5, 5 ],
+		[ 'string mask', '15', 0 ], [ 'null mask', null, 0 ], [ 'absent old-client mask', undefined, undefined ],
+	];
+	for ( let i = 0; i < lightCases.length; i ++ ) {
+		const [ label, mask, expected ] = lightCases[ i ], marker = 102 + i, state = playerState( hA, marker );
+		if ( mask === undefined ) delete state.helicopter.lights; else state.helicopter.lights = mask;
+		A.send( state ); const arrived = await receivedState( B, aId, marker );
+		check( arrived.helicopter?.lights === expected && ( expected !== undefined || ! Object.hasOwn( arrived.helicopter, 'lights' ) ), `real server sanitizes ${ label } without losing valid aircraft`, arrived.helicopter );
+		hB.updateRemote( [ arrived ] ); const remoteVisual = hB.remote.peers.get( aId )?.visual;
+		const visualMask = expected ?? 0;
+		check( remoteVisual === visual && visual.mask === visualMask && visual.lamps.every( l => l.visible === !! ( visualMask & l.bit ) ), `${ label } updates actual remote lamp state without rebuilding aircraft`, { mask: visual.mask, lamps: visual.lamps } );
+	}
 	const invalid = [
 		[ 'zero quaternion', h => { h.q = [ 0, 0, 0, 0 ]; } ],
 		[ 'NaN position', h => { h.p = [ NaN, 1, 2 ]; } ],
@@ -87,11 +113,14 @@ try {
 	await delay( 450 );
 	const schemaParked = JSON.parse( B.link.room.state.players.get( aId ).extra ).helicopter;
 	check( schemaParked.p[ 0 ] === 84 && ! schemaParked.piloted && hB.remote.count === 1, 'parked aircraft remains in connected schema without repeat owner state sends', schemaParked );
+	const parkedVisual = hB.remote.peers.get( aId ).visual;
+	check( schemaParked.lights === 15 && parkedVisual.mask === 15 && parkedVisual.lamps.every( l => l.visible ), 'parked aircraft retains its selected cockpit lighting in connected schema and remote appearance' );
 	const privateBefore = JSON.stringify( hB.toJSON() ), privatePosition = hB.flight.position.clone(), privateHome = hB.homeSlot;
 	A.close(); const leave = await B.next( m => m.t === 'leave' && m.id === aId, 6000 );
 	check( leave.id === aId && await until( () => ! B.link.room.state.players.has( aId ) ), 'real disconnect removes aircraft owner from other client membership' );
 	hB.updateRemote( membership( B ), { complete: true } );
 	check( hB.remote.count === 0, 'actual Helicopter full snapshot removes disconnect ghost immediately' );
+	check( parkedVisual.disposed && parkedVisual.calls.at( - 1 ).kind === 'dispose', 'disconnect disposes the exact parked lit remote visual rather than leaving light ghosts' );
 	check( await until( () => B.link.room.state.host === bId ), 'remaining pilot becomes host through actual schema migration' );
 	const migration = await B.next( m => m.t === 'host' && m.id === bId, 6000 );
 	check( migration.prev === aId && JSON.stringify( hB.toJSON() ) === privateBefore && hB.flight.position.distanceTo( privatePosition ) === 0 && hB.homeSlot === privateHome, 'host migration preserves remaining pilot private helicopter, parking, health and home slot' );

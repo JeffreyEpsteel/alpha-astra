@@ -159,17 +159,27 @@ export class PlaneModels {
 			if ( ! parts && this._load === loadStaticGLB ) try { parts = meshParts( await loadGLB( url ) ); } catch ( e ) { parts = null; }
 			if ( ! parts || parts.length !== glb.meshes.length ) parts = null;
 			const body = [], prop = hubs.map( () => [] ), bodyParts = [];
+			const variant = AIRFRAMES[ af ]?.variant;
 			for ( let i = 0; i < glb.meshes.length; i ++ ) {
 
-				const m = glb.meshes[ i ];
+				let m = glb.meshes[ i ];
+				// Derived models never mutate the original Kestrel's shared geometry.
+				if ( variant ) {
+					m = new Mesh( m.geometry.clone(), m.material );
+					m.name = glb.meshes[ i ].name;
+					const part = parts?.[ i ];
+					if ( part === 'wingL' || part === 'wingR' ) m.geometry.scale( variant.span / GEOM.span, 1, 1 );
+					if ( part === 'tail' ) m.geometry.scale( variant.tail, 1, 1 );
+				}
 				if ( /SeaplaneProp/.test( m.name ) ) {
 
 					// baked at the hub's model position: move it to the pivot's origin once
-					const k = parts && parts[ i ] === 'prop2' && hubs.length > 1 ? 1 : 0, hub = hubs[ k ];
+					const k = parts && parts[ i ] === 'prop2' && hubs.length > 1 ? 1 : 0, hub = variant ? GEOM.prop : hubs[ k ];
 					m.geometry.translate( - hub[ 0 ], - hub[ 1 ], - hub[ 2 ] );
 					m.geometry.computeBoundingBox();
 					m.geometry.computeBoundingSphere();
 					prop[ k ].push( m );
+					if ( variant?.twin ) prop[ 1 ].push( m );
 
 				} else {
 
@@ -178,6 +188,16 @@ export class PlaneModels {
 
 				}
 
+			}
+			if ( variant?.twin ) for ( const hub of hubs ) {
+				const geometry = mergePrepared( [
+					prepare( cylinder( 0.42, 0.5, 1.8, 16 ), { color: 0xf2e6c2, rough: 0.45, matrix: mat4( hub[ 0 ], hub[ 1 ], hub[ 2 ] - 1.05, Math.PI / 2 ) } ),
+					prepare( box( 0.28, 0.36, 1.3 ), { color: 0x0f8f70, rough: 0.55, matrix: mat4( hub[ 0 ], hub[ 1 ] + 0.34, hub[ 2 ] - 1.2 ) } ),
+				] );
+				const m = new Mesh( geometry, createPropMaterial( 'airportTwinNacelle' ) );
+				m.name = 'seaplane-courier-nacelle';
+				body.push( m );
+				bodyParts.push( hub[ 0 ] > 0 ? 'wingL' : 'wingR' );
 			}
 
 			const tpl = { body, prop, parts: bodyParts };

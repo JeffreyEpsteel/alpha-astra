@@ -104,7 +104,7 @@ export class CarAudio {
 		if ( ! ctx ) return;
 		if ( ! this.nodes ) {
 
-			if ( ! s.on && ! s.siren ) return;
+			if ( ! s.on && ! s.siren && ! s.horn ) return;
 			try { this._build( ctx ); } catch ( e ) { this._failed = true; return; }
 
 		}
