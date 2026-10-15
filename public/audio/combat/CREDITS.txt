@@ -1,0 +1,7 @@
+Combat sounds for the on-foot melee feature (src/features/melee).
+Source: Naval fork audio source archive\Combat (the owner's naval fork; ElevenLabs
+text-to-sound generations, receipts in that folder). Converted with ffmpeg: leading silence removed, peak
+normalised to -3 dBFS, mono 48 kHz, Ogg Vorbis q4.
+  paddle_swing_1..4  <- PaddleSwing_V01..V04      hook_swing_1..4  <- HookSwing_V01..V04
+  paddle_hit_1..2    <- PaddleImpact_V03, V04     hook_hit_1..3    <- HookImpact_V02..V04
+PaddleImpact_V01 / V02 and HookImpact_V01 are left out: their peaks sit 28-34 dB below the others (near silent).

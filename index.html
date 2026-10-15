@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<!-- phones and tablets: edge to edge under the notch (ui.css keeps the HUD inside the safe area), no page zoom
+	     (the touch controls own every gesture), installable from Add to Home Screen -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+	<meta name="theme-color" content="#3a9a74" />
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-title" content="Hyptile" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<meta name="format-detection" content="telephone=no" />
+	<link rel="manifest" href="manifest.webmanifest" />
+	<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+	<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+	<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+	<title>Alpha Astra · Hyptile Island</title>
+	<link rel="preload" as="image" href="ui/keyart/hyptile-loader-1280.jpg" imagesrcset="ui/keyart/hyptile-loader-1280.jpg 1280w, ui/keyart/hyptile-loader-2560.jpg 2560w" imagesizes="100vw" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat+Brush&family=Kalam:wght@400;700&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="/src/ui/ui.css" />
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; overscroll-behavior: none; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+		body { -webkit-touch-callout: none; touch-action: manipulation; }
+		#app, #app canvas { display: block; }
+		#fps { position: fixed; top: 10px; left: 12px; z-index: 50; font: 500 12px/1.2 'JetBrains Mono', ui-monospace, monospace;
+			color: #e8f6ff; background: rgba(8, 14, 22, 0.55); padding: 5px 9px; border-radius: 6px; pointer-events: none;
+			backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); letter-spacing: 0.02em; }
+
+		/* Hyptile loading screen (overrides the shared loader look in src/ui/ui.css): the key art of Hyptile on the dock
+		   on the right, a jade glass card on the open sea at the left with the stacked wordmark, a coral / cream / jade
+		   rule, the progress line and the tips. The class names the loader script drives are unchanged. */
+		#loader { background: #062026; }
+		#loader .loader-art { object-position: 70% 40%; transform-origin: 70% 45%; }
+		#loader .loader-scrim {
+			background:
+				linear-gradient(90deg, rgba(3, 18, 22, 0.84) 0%, rgba(3, 18, 22, 0.6) 30%, rgba(3, 18, 22, 0.12) 56%, rgba(3, 18, 22, 0) 72%),
+				linear-gradient(0deg, rgba(3, 14, 18, 0.55) 0%, rgba(3, 14, 18, 0) 30%),
+				radial-gradient(140% 100% at 70% 45%, transparent 60%, rgba(0, 0, 0, 0.4) 100%); }
+		#loader .loader-inner { top: 50%; bottom: auto; right: auto; transform: translateY(-50%); width: min(540px, 42vw); max-width: none;
+			gap: clamp(16px, 2.6vh, 28px); padding: clamp(20px, 3vh, 34px) clamp(20px, 2.4vw, 34px); border-radius: 22px;
+			background: linear-gradient(160deg, rgba(14, 60, 54, 0.62), rgba(6, 26, 30, 0.72));
+			box-shadow: inset 0 0 0 1px rgba(116, 201, 160, 0.28), 0 24px 70px -20px rgba(0, 0, 0, 0.6);
+			backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); }
+		#loader .loader-brand { display: grid; grid-template-columns: auto 1fr; column-gap: clamp(12px, 1.4vw, 18px); align-items: center; }
+		#loader .loader-emblem { grid-row: 1 / span 2; width: clamp(54px, 5.4vw, 78px); height: auto; filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.45)); }
+		#loader .loader-kicker { margin: 0; color: #ffc9a8; letter-spacing: 0.3em; }
+		#loader .loader-title { display: flex; flex-direction: column; margin: 4px 0 0; white-space: nowrap; font-size: min(84px, 14cqi);
+			letter-spacing: 0.16em; line-height: 0.92; background: linear-gradient(180deg, #ffffff 10%, #e8fff4 55%, #8fe3bd 100%);
+			-webkit-background-clip: text; background-clip: text; }
+		#loader .loader-title-sub { margin-top: 0.12em; font-size: 0.42em; letter-spacing: 0.62em; font-weight: 500;
+			background: linear-gradient(90deg, #ffb59a, #f1e3c6 60%); -webkit-background-clip: text; background-clip: text; }
+		#loader .loader-rule { grid-column: 1 / -1; height: 3px; margin-top: clamp(12px, 1.6vh, 18px); border-radius: 3px;
+			background: linear-gradient(90deg, #e8735a 0 33%, #f1e3c6 33% 66%, #3a9a74 66% 100%); opacity: 0.9; }
+		#loader .loader-tagline { grid-column: 1 / -1; max-width: none; margin-top: clamp(10px, 1.4vh, 14px); color: rgba(232, 244, 240, 0.86); }
+		#loader .loader-panel { max-width: none; }
+		#loader .loader-bar { height: 4px; background: rgba(241, 227, 198, 0.16); }
+		#loader .loader-fill { background: linear-gradient(90deg, #e8735a, #f1e3c6 55%, #74c9a0); box-shadow: 0 0 12px rgba(116, 201, 160, 0.55); }
+		#loader .loader-tip-label { color: #74c9a0; border-color: rgba(116, 201, 160, 0.5); }
+		#loader .loader-tips { border-top-color: rgba(241, 227, 198, 0.16); }
+		@media (max-width: 760px) {
+			#loader .loader-art { object-position: 66% 50%; }
+			#loader .loader-scrim { background: linear-gradient(0deg, rgba(3, 18, 22, 0.92) 0%, rgba(3, 18, 22, 0.6) 45%, rgba(3, 18, 22, 0.08) 75%); }
+			#loader .loader-inner { top: auto; bottom: 16px; left: 16px; right: 16px; transform: none; width: auto; }
+		}
+		/* a phone in landscape (~390 px tall): the card loses the tagline and the tips, and keeps inside the notch */
+		@media (max-height: 500px) {
+			#loader .loader-inner { width: min(420px, 48vw); left: max(16px, env(safe-area-inset-left)); gap: 10px; padding: 14px 18px; }
+			#loader .loader-tagline, #loader .loader-tips, #loader .loader-note { display: none; }
+			#loader .loader-rule { margin-top: 8px; }
+			#loader .loader-title { font-size: min(56px, 12cqi); }
+		}
+	</style>
+</head>
+<body>
+	<div id="app"></div>
+	<div id="fps">-- fps</div>
+	<div id="loader" role="status" aria-live="polite" aria-label="Loading Hyptile Island">
+		<img class="loader-art" src="ui/keyart/hyptile-loader-1280.jpg" srcset="ui/keyart/hyptile-loader-1280.jpg 1280w, ui/keyart/hyptile-loader-2560.jpg 2560w" sizes="100vw" alt="" decoding="async" fetchpriority="high" onload="this.classList.add('is-in')" />
+		<div class="loader-scrim"></div>
+		<div class="loader-inner">
+			<div class="loader-brand">
+				<svg class="loader-emblem" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+					<defs>
+						<linearGradient id="ld-jade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9ff0c8"/><stop offset="1" stop-color="#2c8a66"/></linearGradient>
+						<linearGradient id="ld-sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd8a6"/><stop offset="1" stop-color="#e8735a"/></linearGradient>
+					</defs>
+					<circle cx="32" cy="32" r="29" fill="rgba(6, 30, 30, 0.55)" stroke="url(#ld-jade)" stroke-width="2"/>
+					<circle cx="40" cy="20" r="5.5" fill="url(#ld-sun)"/>
+					<path d="M12 37c6-10 18-14 28-10 4 1.6 7 4 9 7-2 3-5 5.4-9 7-10 4-22 0-28-4z" fill="url(#ld-jade)"/>
+					<path d="M12 37l-4-7 1 9-1 8 4-7z" fill="url(#ld-jade)"/>
+					<path d="M30 27c2-4 6-6 10-6-2 2-3 4-3 7z" fill="#74c9a0"/>
+					<circle cx="43" cy="32" r="1.8" fill="#14262a"/>
+					<path d="M14 49c4 0 5-3 9-3s5 3 9 3 5-3 9-3 5 3 9 3" fill="none" stroke="#f1e3c6" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+				</svg>
+				<p class="loader-kicker">An island fishing game</p>
+				<h1 class="loader-title"><span>HYPTILE</span><span class="loader-title-sub">ISLAND</span></h1>
+				<div class="loader-rule"></div>
+				<p class="loader-tagline">Wake up at Jade Landing under the lanterns, cast off the sand, then follow the boardwalk to the harbour: Captain Roid sells the boats, PoorGoat buys the fish and hands out the quests.</p>
+			</div>
+			<div class="loader-panel">
+				<div class="loader-row">
+					<span class="loader-status">Starting…</span>
+					<span class="loader-meta"><span class="loader-pct">0%</span><span class="loader-time">0:00</span></span>
+				</div>
+				<div class="loader-bar"><div class="loader-fill"></div><div class="loader-glint"></div></div>
+				<div class="loader-note">The first launch compiles the shaders and can take a minute or two. Later visits load much faster.</div>
+				<div class="loader-tips">
+					<span class="loader-tip-label">Tip</span>
+					<div class="loader-tip-list">
+						<p class="loader-tip">Press <kbd>R</kbd> for the rod. Hold the left mouse button to wind up, release to cast: the longer you hold, the farther it goes.</p>
+						<p class="loader-tip">You start at Jade Landing, the pavilion at the east end of the bay. The boardwalk runs west past Captain Roid's yard to Ethena Prosper, PoorGoat and the pier.</p>
+						<p class="loader-tip">Watch the bobber. A few nibbles, then it's pulled under: click the left mouse button that moment to set the hook.</p>
+						<p class="loader-tip">In a fight, hold to reel but keep the line tension in the green. Ease off when the fish runs, or the line snaps.</p>
+						<p class="loader-tip">What bites depends on where you fish: the shallows, the pier, the reef, the deep water past the drop-off, and the time of day.</p>
+						<p class="loader-tip">PoorGoat at the fish stand buys your catch and posts quests: story quests earn new crew, and rolling orders pay extra for the fish he wants.</p>
+						<p class="loader-tip">Captain Roid (listen for the clicks) sells boats at the yard east of the pier; Ethena's chandlery sells gear. Press <kbd>K</kbd> for the crew.</p>
+						<p class="loader-tip">Press <kbd>V</kbd> to switch between third and first person. Add <code>?server=ws://host:8765/island</code> to the URL to fish with friends: name tags, chat and one shared island clock.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script type="module" src="/src/main.js"></script>
+</body>
+</html>

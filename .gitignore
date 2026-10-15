@@ -1,0 +1,28 @@
+node_modules
+dist
+.DS_Store
+*.log
+test/out
+
+server-data/
+releases/
+server-data/
+*.tmp
+tools/*/logs/
+
+# wave 18E: mocap sources are re-fetched (tools/roster/fetch-rocketbox.ps1) and re-derived (retarget.py); the clips live in the GLBs
+tools/roster/rocketbox/*.fbx
+tools/roster/retargeted/*.fbx
+tools/roster/__pycache__/
+
+# wave 18A: capture outputs (regenerate with tools/visuals/capture.mjs)
+tools/visuals/out/
+tools/interiors/out/
+
+# Local review evidence, reference projects and host-specific publishing helpers.
+reports/
+runtime/
+inspiration/
+tools/alpha-astra-github.mjs
+tools/codex-browser-qa.mjs
+tools/codex-city-browser-qa.mjs

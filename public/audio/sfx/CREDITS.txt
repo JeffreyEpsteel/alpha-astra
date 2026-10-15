@@ -1,0 +1,13 @@
+Dynamic-audio layer (src/features/sfx). Rebuilt by `node src/features/sfx/tools/make-assets.mjs`.
+
+From the owner's naval fork (Naval fork audio source archive; ElevenLabs generations):
+  rigging_strain.ogg   NavalActions/SailRiggingStrain_V01_Mono.wav
+  cannon_reload.ogg    NavalActions/CannonReload_V01_Mono.wav
+  clown_prank.ogg      ClownPullMyFinger_V4.wav
+  bran_workshop.ogg    ResidentDialogue/Bran_Workshop_V01.mp3
+  iona_workshop.ogg    ResidentDialogue/Iona_Workshop_V01.mp3
+Derived from SailRiggingStrain_V01_Mono.wav (pitched, filtered):
+  hull_groan.ogg       pitched down 45 %, low-passed 650 Hz
+  line_creak.ogg       a 0.45 s slice pitched up 29 %, high-passed 500 Hz (the game varies the rate with tension)
+Synthesised from seeded noise and sine sweeps (no external source): thwack.ogg, thud.ogg, splinter.ogg, sail_luff.ogg.
+Mono Opus in Ogg, 28 - 48 kb/s.
